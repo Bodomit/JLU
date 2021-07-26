@@ -103,17 +103,28 @@ class UTKFace(pl.LightningDataModule):
 
 
 class UTKFaceDataset(Dataset):
-    def __init__(self, x: np.ndarray, y: np.ndarray, transform) -> None:
+    AGE_BIN_BOUNDARIES = [0, 19, 24, 29, 34, 39, 44, 49, 54, 59, 64, 69, 2000]
+
+    def __init__(self, x: np.ndarray, y: np.ndarray, transform, bin_age=True) -> None:
         super().__init__()
         self.x = x
-        self.y = y
         self.transform = transform
+        self.bin_age = bin_age
+
+        if bin_age:
+            age, sex, race = y.T
+            age_bin = np.digitize(age, self.AGE_BIN_BOUNDARIES) - 1
+            self.y = np.vstack((age_bin, sex, race)).T
+        else:
+            self.y = y
+
         assert len(self.x) == len(self.y)
 
     def __getitem__(self, index):
         x = PIL.Image.open(self.x[index])  # type: ignore
         x = self.transform(x)
-        return x, self.y[index]
+        y = self.y[index]
+        return x, y
 
     def __len__(self):
         return len(self.x)
