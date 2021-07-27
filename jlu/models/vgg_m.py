@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 
 
-class VggM(pl.LightningModule):
+class VggMBase(pl.LightningModule):
     def __init__(self):
         super().__init__()
 
@@ -25,10 +25,12 @@ class VggM(pl.LightningModule):
             nn.MaxPool2d(2, 2),
         )
 
-        self.classifier = nn.Sequential(
+        self.fully_connected = nn.Sequential(
+            # FC6
             nn.Linear(512 * 7 * 7, 4096),
             nn.ReLU(True),
             nn.Dropout(),
+            # FC7
             nn.Linear(4096, 4096),
             nn.ReLU(True),
             nn.Dropout(),
@@ -36,5 +38,5 @@ class VggM(pl.LightningModule):
 
     def forward(self, x):
         x = self.features(x)
-        x = self.classifier(x)
+        x = self.fully_connected(x)
         return x
