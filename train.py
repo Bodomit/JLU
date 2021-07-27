@@ -18,7 +18,6 @@ def main(hparams):
         default_root_dir=hparams.output_directory,
         gpus=1,
         auto_select_gpus=True,
-        max_epochs=100,
         log_every_n_steps=50,
         benchmark=True,
         logger=True,

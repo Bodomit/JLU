@@ -3,8 +3,9 @@ from typing import Dict, List, Optional
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
-from jlu.data.utkface import UTKFace
-from jlu.models.multitask import JLUMultitaskModel
+from jlu.data import UTKFace
+from jlu.losses import UniformTargetKLDivergence
+from jlu.models import JLUMultitaskModel
 
 
 class JLUTrainer(pl.LightningModule):
@@ -15,8 +16,8 @@ class JLUTrainer(pl.LightningModule):
         learning_rate: float,
         primary_task: str,
         secondary_task: List[str],
-        grads_near_zero_threshold: float = 2e-9,
-        **kwargs
+        grads_near_zero_threshold: float = 1e-5,
+        **kwargs,
     ) -> None:
         super().__init__()
         self.save_hyperparameters()
@@ -26,7 +27,8 @@ class JLUTrainer(pl.LightningModule):
         self.alpha = alpha
         self.learning_rate = learning_rate
         self.grads_near_zero_threshold = grads_near_zero_threshold
-        self.grads_are_near_zero = False
+        self.ls_grads_are_near_zero = True
+        self.train_lp_lconf = True
         self.automatic_optimization = False
 
         self.datamodule = self.load_datamodule(datamodule, **kwargs)
@@ -41,6 +43,9 @@ class JLUTrainer(pl.LightningModule):
         n_classes = self.datamodule.n_classes[all_idx]
         self.model = JLUMultitaskModel(n_classes)
 
+        # Store the loss object.
+        self.uniform_kldiv = UniformTargetKLDivergence()
+
     def load_datamodule(self, datamodule: str, **kwargs) -> pl.LightningDataModule:
         if datamodule.lower() == "utkface":
             return UTKFace(**kwargs)
@@ -50,106 +55,109 @@ class JLUTrainer(pl.LightningModule):
     def get_label_index(self, label: str):
         return self.datamodule.labels.index(label)
 
-    def attribute_grads_near_zero(self) -> bool:
+    def grads_near_zero(self) -> bool:
         grad_total = 0.0
-        for param in self.model.parameters():
-            assert param.grad
+        for param in (p for p in self.model.parameters() if p.grad is not None):
+            assert param.grad is not None
             grad_total += param.grad.abs().sum()
 
-        assert isinstance(grad_total, float)
-        return grad_total < self.grads_near_zero_threshold
+        return grad_total < self.grads_near_zero_threshold  # type: ignore
 
     def on_epoch_start(self) -> None:
         super().on_epoch_start()
-        self.grads_are_near_zero = False
+        if self.ls_grads_are_near_zero:
+            self.train_lp_lconf = True
+        elif self.train_lp_lconf:
+            self.ls_grads_are_near_zero = False
+            self.train_lp_lconf = False
 
     def on_train_batch_start(
         self, batch, batch_idx: int, dataloader_idx: int
     ) -> Optional[int]:
         super().on_train_batch_start(batch, batch_idx, dataloader_idx)
-        # Stops the epoch early if on an even (Ls training) epoch and grads
-        # are near zero.
-        if self.current_epoch % 2 == 0 and self.grads_are_near_zero:
+        # Stops the epoch early grads are near zero.
+        if self.ls_grads_are_near_zero and not self.train_lp_lconf:
             return -1
 
     def training_step_Ls(self, batch, batch_idx):
 
         # Train attribute model only.
-        self.model.freeze()
-        self.model.unfreeze()
+        self.model.requires_grad_(False)
+        self.model.secondary_tasks.requires_grad_(True)
 
         opt = self.optimizers()
         assert isinstance(opt, torch.optim.Optimizer)
         opt.zero_grad()
 
         # Get the batch.
-        xb, (_, ab) = batch
-        ab = ab.squeeze()
+        xb, yb = batch
 
-        _, attribute_pred = self.model(xb)
+        y_secondary = yb[:, self.seconday_idx]
+        _, *y_secondary_ = self.model(xb)
 
-        attribute_loss = F.cross_entropy(attribute_pred, ab, self.attribute_weights)
-        self.log(
-            "loss/stage1", attribute_loss, on_step=True, on_epoch=True, prog_bar=True
-        )
+        y_secondary_losses = torch.zeros(len(y_secondary_), device=self.device)
+        for i, ys_ in enumerate(y_secondary_):
+            ys_loss = F.cross_entropy(ys_, y_secondary[:, i])
+            y_secondary_losses[i] = ys_loss
 
-        self.manual_backward(attribute_loss)
+        ls = torch.sum(y_secondary_losses)
+        self.log("loss/ls", ls, on_step=True, on_epoch=True, prog_bar=True)
 
-        self.grads_are_near_zero = self.attribute_grads_near_zero()
+        self.manual_backward(ls)
+
+        self.ls_grads_are_near_zero = self.grads_near_zero()
 
         opt.step()
         opt.zero_grad()
 
     def training_step_Lp_Lconf(self, batch, batch_idx):
-
-        # Train on the FC layers in the model only.
-        self.model.unfreeze()
-        self.model.attribute_model.freeze()
-
-        # If using the pretrained model, only unfreeze the extra fc layers.
-        if self.model.feature_model.use_pretrained:
-            self.model.feature_model.resnet.requires_grad = False
-            self.model.feature_model.extra_fc.requires_grad = True
-        else:
-            self.model.feature_model.unfreeze()
+        self.model.requires_grad_(True)
+        self.model.secondary_tasks.requires_grad_(False)
 
         opt = self.optimizers()
         assert isinstance(opt, torch.optim.Optimizer)
         opt.zero_grad()
 
         # Get the batch.
-        xb, (yb, ab) = batch
-        ab = ab.squeeze()
+        xb, yb = batch
+        y_primary = yb[:, self.primary_idx]
 
-        logits, attribute_pred = self.model(xb)
+        # Get the primary and secondary outputs.
+        # Note that y_secondary_ is a list of outputs.
+        y_primary_, *y_secondary_ = self.model(xb)
 
-        # Log metrics.
-        metrics = self.training_step_attribute_metrics(ab, attribute_pred)
-        self.log_dict(metrics)
+        # Calculate the primary loss
+        lp = F.cross_entropy(y_primary_, y_primary)
+        self.log(f"loss/lp", lp, on_step=True, on_epoch=True, prog_bar=True)
 
-        # Backprop the multi-task loss.
-        assert isinstance(logits, torch.Tensor)
-        total_loss, sub_losses = self.get_totalloss_with_sublosses(
-            self.loss,
-            yb,
-            ab,
-            logits,
-            attribute_pred,
-            prefix="loss/stage2/",
-        )
-        self.log("loss/stage2/total", total_loss, on_step=True, on_epoch=True)
-        self.log_dict(sub_losses, on_step=True, on_epoch=True, prog_bar=True)
+        # Calculate the confusion losses.
+        lconfs = torch.stack([self.uniform_kldiv(ys_) for ys_ in y_secondary_])
+        for i, lconf_m in enumerate(lconfs):
+            self.log(f"loss/lconf/{i}", lconf_m, on_step=True, on_epoch=True)
+
+        lconf = lconfs.sum()
+        self.log(f"loss/lconf", lconf, on_step=True, on_epoch=True, prog_bar=True)
+
+        # Get the total loss.
+        total_loss = lp + (self.alpha * lconf)
+        self.log(f"loss/total", total_loss, on_step=True, on_epoch=True, prog_bar=True)
+
         self.manual_backward(total_loss)
         opt.step()
         opt.zero_grad()
 
     def training_step(self, batch, batch_idx):
-        # If on an even Epoch (starting at 0), train Ls.
-        # If on an odd Epoch (starting at 1), train combined loss.
-        if self.current_epoch % 2 == 0:
-            return self.training_step_Ls(batch, batch_idx)
+        if self.train_lp_lconf:
+            self.training_step_Lp_Lconf(batch, batch_idx)
         else:
-            return self.training_step_Lp_Lconf(batch, batch_idx)
+            self.training_step_Ls(batch, batch_idx)
 
     def configure_optimizers(self):
-        return (torch.optim.SGD(self.model.parameters(), lr=self.learning_rate),)
+        return torch.optim.SGD(
+            [
+                {"params": self.model.feature_base.parameters()},
+                {"params": self.model.primary_task.parameters(), "lr": 1e-3},
+                {"params": self.model.secondary_tasks.parameters(), "lr": 1e-3},
+            ],
+            lr=1e-4,
+        )

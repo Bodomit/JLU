@@ -95,6 +95,8 @@ class UTKFace(pl.LightningDataModule):
         assert isinstance(test_x, np.ndarray)
         assert isinstance(test_y, np.ndarray)
 
+        self.num_workers = min(32, len(os.sched_getaffinity(0)))
+
         # Construct the datasets.
         self.train = UTKFaceDataset(train_x, train_y, self.train_transforms)
         self.valid = UTKFaceDataset(valid_x, valid_y, self.val_transforms)
@@ -104,13 +106,19 @@ class UTKFace(pl.LightningDataModule):
         self.n_classes = self.get_unique_in_columns(self.y)
 
     def train_dataloader(self):
-        return DataLoader(self.train, self.batch_size, shuffle=True)
+        return DataLoader(
+            self.train, self.batch_size, shuffle=True, num_workers=self.num_workers
+        )
 
     def val_dataloader(self):
-        return DataLoader(self.valid, self.batch_size, shuffle=False)
+        return DataLoader(
+            self.valid, self.batch_size, shuffle=False, num_workers=self.num_workers
+        )
 
     def test_dataloader(self):
-        return DataLoader(self.test, self.batch_size, shuffle=False)
+        return DataLoader(
+            self.test, self.batch_size, shuffle=False, num_workers=self.num_workers
+        )
 
     @staticmethod
     def parse_filenames(filenames: List[str]):

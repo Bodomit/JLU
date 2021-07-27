@@ -19,12 +19,12 @@ class JLUMultitaskModel(pl.LightningModule):
         self.primary_task = nn.Linear(self.feature_length, n_primary)
         self.secondary_tasks = self.construct_secondaries(n_secondaries)
 
-    def construct_secondaries(self, n_classes: List[int]):
+    def construct_secondaries(self, n_classes: List[int]) -> nn.ModuleList:
         secondary_tasks: List[nn.Linear] = []
         for n in n_classes:
             secondary_task = nn.Linear(self.feature_length, n)
             secondary_tasks.append(secondary_task)
-        return secondary_tasks
+        return nn.ModuleList(secondary_tasks)
 
     def forward(self, x):
         features = self.feature_base(x)
