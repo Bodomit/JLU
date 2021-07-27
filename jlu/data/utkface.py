@@ -13,6 +13,9 @@ from .utils import parse_dataset_dir, read_filenames
 
 
 class UTKFace(pl.LightningDataModule):
+
+    AGE_BIN_BOUNDARIES = [0, 19, 24, 29, 34, 39, 44, 49, 54, 59, 64, 69, 2000]
+
     def __init__(
         self,
         batch_size: int,
@@ -20,12 +23,14 @@ class UTKFace(pl.LightningDataModule):
         image_size=(224, 224),
         test_split=0.1,
         val_split=0.1,
+        bin_age=True,
     ):
         self.batch_size = batch_size
         self.dataset_dir = parse_dataset_dir(dataset_dir)
         self.test_split = test_split
         self.val_split = val_split
         self.train_split = 1 - val_split - test_split
+        self.bin_age = bin_age
 
         # Define the transformations.
         common_transforms = transforms.Compose(
@@ -58,6 +63,16 @@ class UTKFace(pl.LightningDataModule):
         self.x = np.array(list(x))  # type: ignore
         self.y = np.array(list(y))  # type: ignore
 
+        assert isinstance(self.x, np.ndarray)
+        assert isinstance(self.y, np.ndarray)
+
+        # Bin the age to Alvi2019 JLU Paper
+        if self.bin_age:
+            age, sex, race = self.y.T
+            age_bin = np.digitize(age, self.AGE_BIN_BOUNDARIES) - 1
+            self.y = np.vstack((age_bin, sex, race)).T
+
+        # Calculate train, validation, test splits.
         train_x, val_test_x, train_y, val_test_y = train_test_split(
             self.x, self.y, train_size=self.train_split, random_state=42
         )
@@ -77,9 +92,13 @@ class UTKFace(pl.LightningDataModule):
         assert isinstance(test_x, np.ndarray)
         assert isinstance(test_y, np.ndarray)
 
+        # Construct the datasets.
         self.train = UTKFaceDataset(train_x, train_y, self.train_transforms)
         self.valid = UTKFaceDataset(valid_x, valid_y, self.val_transforms)
         self.test = UTKFaceDataset(test_x, test_y, self.test_transforms)
+
+        # Store the number of classes per label.
+        self.n_classes = self.get_unique_in_columns(self.y)
 
     def train_dataloader(self):
         return DataLoader(self.train, self.batch_size, shuffle=True)
@@ -101,22 +120,21 @@ class UTKFace(pl.LightningDataModule):
 
         return parsed_filenames
 
+    @staticmethod
+    def get_unique_in_columns(arr: np.ndarray):
+        n_classes: List[int] = []
+        n_cols = arr.shape[1]
+        for i in range(n_cols):
+            n_classes.append(len(np.unique(arr[:, i])))
+        return n_classes
+
 
 class UTKFaceDataset(Dataset):
-    AGE_BIN_BOUNDARIES = [0, 19, 24, 29, 34, 39, 44, 49, 54, 59, 64, 69, 2000]
-
     def __init__(self, x: np.ndarray, y: np.ndarray, transform, bin_age=True) -> None:
         super().__init__()
         self.x = x
+        self.y = y
         self.transform = transform
-        self.bin_age = bin_age
-
-        if bin_age:
-            age, sex, race = y.T
-            age_bin = np.digitize(age, self.AGE_BIN_BOUNDARIES) - 1
-            self.y = np.vstack((age_bin, sex, race)).T
-        else:
-            self.y = y
 
         assert len(self.x) == len(self.y)
 
