@@ -24,6 +24,7 @@ class UTKFace(pl.LightningDataModule):
         test_split=0.1,
         val_split=0.1,
         bin_age=True,
+        **kwargs,
     ):
         self.batch_size = batch_size
         self.dataset_dir = parse_dataset_dir(dataset_dir)
@@ -31,6 +32,8 @@ class UTKFace(pl.LightningDataModule):
         self.val_split = val_split
         self.train_split = 1 - val_split - test_split
         self.bin_age = bin_age
+
+        self.labels = ["age", "sex", "race"]
 
         # Define the transformations.
         common_transforms = transforms.Compose(
