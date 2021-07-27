@@ -4,6 +4,7 @@ import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
 from jlu.data.utkface import UTKFace
+from jlu.models.multitask import JLUMultitaskModel
 
 
 class JLUTrainer(pl.LightningModule):
@@ -29,10 +30,16 @@ class JLUTrainer(pl.LightningModule):
         self.automatic_optimization = False
 
         self.datamodule = self.load_datamodule(datamodule, **kwargs)
+        self.datamodule.setup()
 
         # Get label indexes per task.
         self.primary_idx = self.get_label_index(primary_task)
         self.seconday_idx = [self.get_label_index(s) for s in secondary_task]
+        all_idx: List[int] = [self.primary_idx] + self.seconday_idx
+
+        # Get the model.
+        n_classes = self.datamodule.n_classes[all_idx]
+        self.model = JLUMultitaskModel(n_classes)
 
     def load_datamodule(self, datamodule: str, **kwargs) -> pl.LightningDataModule:
         if datamodule.lower() == "utkface":

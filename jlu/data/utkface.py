@@ -124,12 +124,12 @@ class UTKFace(pl.LightningDataModule):
         return parsed_filenames
 
     @staticmethod
-    def get_unique_in_columns(arr: np.ndarray):
+    def get_unique_in_columns(arr: np.ndarray) -> np.ndarray:
         n_classes: List[int] = []
         n_cols = arr.shape[1]
         for i in range(n_cols):
             n_classes.append(len(np.unique(arr[:, i])))
-        return n_classes
+        return np.array(n_classes)
 
 
 class UTKFaceDataset(Dataset):
