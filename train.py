@@ -3,6 +3,7 @@ from argparse import ArgumentParser
 
 import pytorch_lightning as pl
 
+from jlu.callbacks import JLUAwareEarlyStopping
 from jlu.systems import JLUTrainer
 
 
@@ -13,6 +14,9 @@ def main(hparams):
     # Construct model.
     model = JLUTrainer(**vars(hparams))
 
+    # Callbacks
+    callbacks = [JLUAwareEarlyStopping("val_loss")]
+
     # Get Trainer.
     trainer = pl.Trainer(
         default_root_dir=hparams.output_directory,
@@ -21,6 +25,7 @@ def main(hparams):
         log_every_n_steps=50,
         benchmark=True,
         logger=True,
+        callbacks=callbacks,
     )
 
     # Train

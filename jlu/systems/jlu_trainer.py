@@ -140,7 +140,9 @@ class JLUTrainer(pl.LightningModule):
 
         # Get the total loss.
         total_loss = lp + (self.alpha * lconf)
-        self.log(f"loss/total", total_loss, on_step=True, on_epoch=True, prog_bar=True)
+        self.log(
+            f"loss/lp+alconf", total_loss, on_step=True, on_epoch=True, prog_bar=True
+        )
 
         self.manual_backward(total_loss)
         opt.step()
