@@ -16,6 +16,7 @@ class JLUTrainer(pl.LightningModule):
         learning_rate: float,
         primary_task: str,
         secondary_task: List[str],
+        bootstrap_epochs: int,
         grads_near_zero_threshold: float = 1e-5,
         **kwargs,
     ) -> None:
@@ -27,6 +28,7 @@ class JLUTrainer(pl.LightningModule):
         self.alpha = alpha
         self.learning_rate = learning_rate
         self.grads_near_zero_threshold = grads_near_zero_threshold
+        self.bootstrap_epochs = bootstrap_epochs
         self.ls_grads_are_near_zero = False
         self.train_lp_lconf = False
         self.automatic_optimization = False
@@ -72,6 +74,9 @@ class JLUTrainer(pl.LightningModule):
         else:
             # Else train ls until grads are near zero.
             self.train_lp_lconf = False
+
+        if self.current_epoch < self.bootstrap_epochs:
+            self.train_lp_lconf = True
 
     def on_epoch_end(self) -> None:
         super().on_epoch_end()

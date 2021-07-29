@@ -41,6 +41,7 @@ if __name__ == "__main__":
     parser.add_argument("--alpha", "-a", default=0.1, type=float)
     parser.add_argument("--learning-rate", "-lr", default=1e-4, type=float)
     parser.add_argument("--batch-size", "-b", default=32, type=int)
+    parser.add_argument("--bootstrap-epochs", default=10, type=int)
     hyperparams = parser.parse_args()
 
     main(hyperparams)
