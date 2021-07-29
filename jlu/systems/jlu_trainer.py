@@ -27,10 +27,9 @@ class JLUTrainer(pl.LightningModule):
         self.alpha = alpha
         self.learning_rate = learning_rate
         self.grads_near_zero_threshold = grads_near_zero_threshold
-        self.ls_grads_are_near_zero = True
-        self.train_lp_lconf = True
+        self.ls_grads_are_near_zero = False
+        self.train_lp_lconf = False
         self.automatic_optimization = False
-
         self.datamodule = self.load_datamodule(datamodule, **kwargs)
         self.datamodule.setup()
 
@@ -61,15 +60,31 @@ class JLUTrainer(pl.LightningModule):
             assert param.grad is not None
             grad_total += param.grad.abs().sum()
 
-        return grad_total < self.grads_near_zero_threshold  # type: ignore
+        result = bool(grad_total < self.grads_near_zero_threshold)
+        return result
 
     def on_epoch_start(self) -> None:
         super().on_epoch_start()
+        # If the ls grads were are near zero on last epoch
+        # train lp and lconf.
         if self.ls_grads_are_near_zero:
             self.train_lp_lconf = True
-        elif self.train_lp_lconf:
-            self.ls_grads_are_near_zero = False
+        else:
+            # Else train ls until grads are near zero.
             self.train_lp_lconf = False
+
+    def on_epoch_end(self) -> None:
+        super().on_epoch_end()
+        # If current epoch was training lp and lconf
+        # reset ls_grads_are_near_zero flag.
+        if self.train_lp_lconf:
+            self.ls_grads_are_near_zero = False
+
+    def training_step(self, batch, batch_idx):
+        if self.train_lp_lconf:
+            self.training_step_Lp_Lconf(batch, batch_idx)
+        else:
+            self.training_step_Ls(batch, batch_idx)
 
     def on_train_batch_start(
         self, batch, batch_idx: int, dataloader_idx: int
@@ -148,11 +163,32 @@ class JLUTrainer(pl.LightningModule):
         opt.step()
         opt.zero_grad()
 
-    def training_step(self, batch, batch_idx):
-        if self.train_lp_lconf:
-            self.training_step_Lp_Lconf(batch, batch_idx)
-        else:
-            self.training_step_Ls(batch, batch_idx)
+    def validation_step(self, batch, batch_idx):
+        # Get the batch.
+        xb, yb = batch
+        y_primary = yb[:, self.primary_idx]
+
+        # Get the primary and secondary outputs.
+        # Note that y_secondary_ is a list of outputs.
+        y_primary_, *y_secondary_ = self.model(xb)
+
+        # Calculate the primary loss
+        lp = F.cross_entropy(y_primary_, y_primary)
+        self.log(f"val_loss/lp", lp, on_epoch=True)
+
+        # Calculate the confusion losses.
+        lconfs = torch.stack([self.uniform_kldiv(ys_) for ys_ in y_secondary_])
+        for i, lconf_m in enumerate(lconfs):
+            self.log(f"val_loss/lconf/{i}", lconf_m)
+
+        lconf = lconfs.sum()
+        self.log(f"val_loss/lconf", lconf)
+
+        # Get the total loss.
+        total_loss = lp + (self.alpha * lconf)
+        self.log(f"val_loss/lp+alconf", total_loss)
+
+        return total_loss
 
     def configure_optimizers(self):
         return torch.optim.SGD(

@@ -15,7 +15,7 @@ def main(hparams):
     model = JLUTrainer(**vars(hparams))
 
     # Callbacks
-    callbacks = [JLUAwareEarlyStopping("val_loss")]
+    callbacks = [JLUAwareEarlyStopping("val_loss/lp+alconf")]
 
     # Get Trainer.
     trainer = pl.Trainer(

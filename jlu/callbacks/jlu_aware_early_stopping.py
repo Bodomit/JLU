@@ -6,10 +6,6 @@ from pytorch_lightning.callbacks import EarlyStopping
 
 
 class JLUAwareEarlyStopping(EarlyStopping):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.skip_check = False
-
     def on_train_epoch_end(
         self, trainer: Trainer, pl_module: JLUTrainer, outputs: Any
     ) -> None:
