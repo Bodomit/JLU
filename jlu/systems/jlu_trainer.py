@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from jlu.data import UTKFace
 from jlu.losses import UniformTargetKLDivergence
 from jlu.models import JLUMultitaskModel
+from torch._C import device
 
 
 class JLUTrainer(pl.LightningModule):
@@ -36,9 +37,11 @@ class JLUTrainer(pl.LightningModule):
         self.datamodule.setup()
 
         # Get label indexes per task.
-        self.primary_idx = self.get_label_index(primary_task)
-        self.seconday_idx = [self.get_label_index(s) for s in secondary_task]
-        all_idx: List[int] = [self.primary_idx] + self.seconday_idx
+        self.primary_idx: int = self.get_label_index(primary_task)
+        self.secondary_idx: List[int] = [
+            self.get_label_index(s) for s in secondary_task
+        ]
+        all_idx: List[int] = [self.primary_idx] + self.secondary_idx
 
         # Get the model.
         n_classes = self.datamodule.n_classes[all_idx]
@@ -46,6 +49,15 @@ class JLUTrainer(pl.LightningModule):
 
         # Store the loss object.
         self.uniform_kldiv = UniformTargetKLDivergence()
+
+        # Get the weights.
+        self.y_primary_weights = torch.tensor(
+            self.datamodule.train.weights_per_label[self.primary_idx], dtype=torch.float
+        )
+        self.y_secondary_weights = [
+            torch.tensor(self.datamodule.train.weights_per_label[i], dtype=torch.float)
+            for i in self.secondary_idx
+        ]
 
     def load_datamodule(self, datamodule: str, **kwargs) -> pl.LightningDataModule:
         if datamodule.lower() == "utkface":
@@ -117,7 +129,9 @@ class JLUTrainer(pl.LightningModule):
 
         y_secondary_losses = torch.zeros(len(y_secondary_), device=self.device)
         for i, ys_ in enumerate(y_secondary_):
-            ys_loss = F.cross_entropy(ys_, y_secondary[:, i])
+            ys_loss = F.cross_entropy(
+                ys_, y_secondary[:, i], self.y_secondary_weights[i].to(self.device)
+            )
             y_secondary_losses[i] = ys_loss
 
         ls = torch.sum(y_secondary_losses)
@@ -147,7 +161,9 @@ class JLUTrainer(pl.LightningModule):
         y_primary_, *y_secondary_ = self.model(xb)
 
         # Calculate the primary loss
-        lp = F.cross_entropy(y_primary_, y_primary)
+        lp = F.cross_entropy(
+            y_primary_, y_primary, self.y_primary_weights.to(self.device)
+        )
         self.log(f"loss/lp", lp, on_step=True, on_epoch=True, prog_bar=True)
 
         # Calculate the confusion losses.

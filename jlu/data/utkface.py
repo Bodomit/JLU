@@ -5,6 +5,7 @@ from typing import List, Optional, Set, Tuple
 import numpy as np
 import PIL
 import pytorch_lightning as pl
+import torch
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
@@ -105,6 +106,8 @@ class UTKFace(pl.LightningDataModule):
         # Store the number of classes per label.
         self.n_classes = self.get_unique_in_columns(self.y)
 
+        # Calculate the weights per class per label per split.
+
     def train_dataloader(self):
         return DataLoader(
             self.train, self.batch_size, shuffle=True, num_workers=self.num_workers
@@ -139,13 +142,27 @@ class UTKFace(pl.LightningDataModule):
             n_classes.append(len(np.unique(arr[:, i])))
         return np.array(n_classes)
 
+    @staticmethod
+    def calculate_class_weights(arr: np.ndarray) -> List[np.ndarray]:
+        n_weights: List[np.ndarray] = []
+        n_cols = arr.shape[1]
+
+        for i in range(n_cols):
+            n_classes_count = np.unique(arr[:, i], return_counts=True)
+
+        return n_weights
+
 
 class UTKFaceDataset(Dataset):
-    def __init__(self, x: np.ndarray, y: np.ndarray, transform, bin_age=True) -> None:
+    def __init__(self, x: np.ndarray, y: np.ndarray, transform) -> None:
         super().__init__()
         self.x = x
         self.y = y
         self.transform = transform
+        self.support_per_label = self.calc_support_for_labels(self.y)
+        self.weights_per_label = self.calc_weights_for_classes_per_label(
+            self.support_per_label
+        )
 
         assert len(self.x) == len(self.y)
 
@@ -157,3 +174,23 @@ class UTKFaceDataset(Dataset):
 
     def __len__(self):
         return len(self.x)
+
+    @staticmethod
+    def calc_support_for_labels(labels: np.ndarray) -> List[np.ndarray]:
+        support_per_label: List[np.ndarray] = []
+        for i in range(labels.shape[1]):
+            _, c = np.unique(labels[:, i], return_counts=True)
+            support_per_label.append(c)
+        return support_per_label
+
+    @staticmethod
+    def calc_weights_for_classes_per_label(
+        support_per_label: List[np.ndarray],
+    ) -> List[np.ndarray]:
+        weights_per_label: List[np.ndarray] = []
+        for support in support_per_label:
+            weights = 1 / support
+            weights = weights / weights.sum() * len(weights)
+            weights_per_label.append(weights)
+
+        return weights_per_label
