@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=JLU-Train
+#SBATCH --job-name=JLU-PreTrain
 #SBATCH --partition=k2-gpu
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
@@ -11,5 +11,5 @@
 
 module add nvidia-cuda
 
-srun python -m pretrain /mnt/scratch2/users/40057686/results/jlu-train -b 128
+srun python -m pretrain /mnt/scratch2/users/40057686/results/jlu-pretrain -b 128
 
