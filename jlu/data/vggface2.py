@@ -16,7 +16,7 @@ class VGGFace2(pl.LightningDataModule):
     def __init__(
         self,
         batch_size: int,
-        dataset_dir="vggface2",
+        dataset_dir="vggface2_MTCNN",
         image_size=(224, 224),
         val_split=0.1,
         **kwargs
