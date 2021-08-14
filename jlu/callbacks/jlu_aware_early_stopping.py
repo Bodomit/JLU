@@ -7,10 +7,12 @@ from pytorch_lightning.callbacks import EarlyStopping
 
 class JLUAwareEarlyStopping(EarlyStopping):
     def on_train_epoch_end(
-        self, trainer: Trainer, pl_module: JLUTrainer, outputs: Any
+        self, trainer: Trainer, pl_module: JLUTrainer, *args
     ) -> None:
+        assert isinstance(trainer, Trainer)
+        assert isinstance(pl_module, JLUTrainer)
         if pl_module.train_lp_lconf:
-            return super().on_train_epoch_end(trainer, pl_module, outputs)
+            return super().on_train_epoch_end(trainer, pl_module)
         else:
             return
 
