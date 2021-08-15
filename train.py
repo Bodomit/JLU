@@ -14,9 +14,6 @@ def main(hparams):
     # Construct model.
     model = JLUTrainer(**vars(hparams))
 
-    # Callbacks
-    callbacks = [JLUAwareEarlyStopping("val_loss/lp+alconf")]
-
     # Get Trainer.
     trainer = pl.Trainer(
         default_root_dir=hparams.output_directory,
@@ -25,7 +22,7 @@ def main(hparams):
         log_every_n_steps=50,
         benchmark=True,
         logger=True,
-        callbacks=callbacks,
+        auto_lr_find=True,
     )
 
     # Train

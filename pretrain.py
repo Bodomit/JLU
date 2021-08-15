@@ -21,6 +21,7 @@ def main(hparams):
         log_every_n_steps=50,
         benchmark=True,
         logger=True,
+        auto_lr_find=True,
     )
 
     # Train

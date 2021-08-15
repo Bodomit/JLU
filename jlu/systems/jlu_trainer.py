@@ -3,10 +3,12 @@ from typing import Dict, List, Optional
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
+from jlu.callbacks import JLUAwareEarlyStopping
 from jlu.data import UTKFace
 from jlu.losses import UniformTargetKLDivergence
 from jlu.models import JLUMultitaskModel
-from torch._C import device
+from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 
 class JLUTrainer(pl.LightningModule):
@@ -124,7 +126,7 @@ class JLUTrainer(pl.LightningModule):
         # Get the batch.
         xb, yb = batch
 
-        y_secondary = yb[:, self.seconday_idx]
+        y_secondary = yb[:, self.secondary_idx]
         _, *y_secondary_ = self.model(xb)
 
         y_secondary_losses = torch.zeros(len(y_secondary_), device=self.device)
@@ -211,12 +213,19 @@ class JLUTrainer(pl.LightningModule):
 
         return total_loss
 
-    def configure_optimizers(self):
-        return torch.optim.SGD(
-            [
-                {"params": self.model.feature_base.parameters()},
-                {"params": self.model.primary_task.parameters(), "lr": 1e-3},
-                {"params": self.model.secondary_tasks.parameters(), "lr": 1e-3},
-            ],
-            lr=1e-4,
+    def configure_callbacks(self):
+        super().configure_callbacks()
+        early_stopping = JLUAwareEarlyStopping("val_loss/lp+alconf", patience=20)
+        checkpoint = ModelCheckpoint(
+            monitor="val_loss/lp+alconf", save_last=True, save_top_k=3
         )
+        return [early_stopping, checkpoint]
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.SGD(self.model.parameters(), lr=self.learning_rate)
+        return optimizer
+        # [
+        #     {"params": self.model.feature_base.parameters()},
+        #     {"params": self.model.primary_task.parameters(), "lr": 1e-3},
+        #     {"params": self.model.secondary_tasks.parameters(), "lr": 1e-3},
+        # ],
