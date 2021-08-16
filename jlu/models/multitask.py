@@ -3,6 +3,7 @@ from typing import List
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
+from torch.nn.modules.container import Sequential
 
 from .vgg_m import VggMBase
 
@@ -18,6 +19,8 @@ class JLUMultitaskModel(pl.LightningModule):
         self.feature_base = VggMBase()
         self.primary_task = nn.Linear(self.feature_length, n_primary)
         self.secondary_tasks = self.construct_secondaries(n_secondaries)
+
+        self.primary = Sequential(self.feature_base, self.primary_task)
 
     def construct_secondaries(self, n_classes: List[int]) -> nn.ModuleList:
         secondary_tasks: List[nn.Linear] = []

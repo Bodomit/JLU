@@ -22,7 +22,6 @@ def main(hparams):
         log_every_n_steps=50,
         benchmark=True,
         logger=True,
-        auto_lr_find=True,
     )
 
     # Train
@@ -36,7 +35,7 @@ if __name__ == "__main__":
     parser.add_argument("--primary-task", "-p", default="age")
     parser.add_argument("--secondary-task", "-s", default=["sex"], action="append")
     parser.add_argument("--alpha", "-a", default=0.1, type=float)
-    parser.add_argument("--learning-rate", "-lr", default=1e-4, type=float)
+    parser.add_argument("--learning-rate", "-lr", default=1e-5, type=float)
     parser.add_argument("--batch-size", "-b", default=32, type=int)
     parser.add_argument("--bootstrap-epochs", default=10, type=int)
     hyperparams = parser.parse_args()

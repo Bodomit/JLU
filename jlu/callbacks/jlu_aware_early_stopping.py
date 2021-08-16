@@ -10,7 +10,7 @@ class JLUAwareEarlyStopping(EarlyStopping):
     ) -> None:
 
         if pl_module.train_lp_lconf:
-            return super().on_train_epoch_end(trainer, pl_module)
+            return super().on_train_epoch_end(trainer, pl_module, None)
         else:
             return
 

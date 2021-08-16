@@ -1,3 +1,4 @@
+import itertools
 from typing import Dict, List, Optional
 
 import pytorch_lightning as pl
@@ -7,8 +8,8 @@ from jlu.callbacks import JLUAwareEarlyStopping
 from jlu.data import UTKFace
 from jlu.losses import UniformTargetKLDivergence
 from jlu.models import JLUMultitaskModel
-from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+from pytorch_lightning.callbacks import ModelCheckpoint
+from torchmetrics.functional import accuracy
 
 
 class JLUTrainer(pl.LightningModule):
@@ -99,7 +100,7 @@ class JLUTrainer(pl.LightningModule):
         if self.train_lp_lconf:
             self.ls_grads_are_near_zero = False
 
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch, batch_idx, optimizer_idx):
         if self.train_lp_lconf:
             self.training_step_Lp_Lconf(batch, batch_idx)
         else:
@@ -114,12 +115,7 @@ class JLUTrainer(pl.LightningModule):
             return -1
 
     def training_step_Ls(self, batch, batch_idx):
-
-        # Train attribute model only.
-        self.model.requires_grad_(False)
-        self.model.secondary_tasks.requires_grad_(True)
-
-        opt = self.optimizers()
+        opt = self.optimizers()[1]  # type: ignore
         assert isinstance(opt, torch.optim.Optimizer)
         opt.zero_grad()
 
@@ -137,20 +133,16 @@ class JLUTrainer(pl.LightningModule):
             y_secondary_losses[i] = ys_loss
 
         ls = torch.sum(y_secondary_losses)
-        self.log("loss/ls", ls, on_step=True, on_epoch=True, prog_bar=True)
+        self.log("loss/ls", ls, prog_bar=True)
 
         self.manual_backward(ls)
 
         self.ls_grads_are_near_zero = self.grads_near_zero()
 
         opt.step()
-        opt.zero_grad()
 
     def training_step_Lp_Lconf(self, batch, batch_idx):
-        self.model.requires_grad_(True)
-        self.model.secondary_tasks.requires_grad_(False)
-
-        opt = self.optimizers()
+        opt = self.optimizers()[0]  # type: ignore
         assert isinstance(opt, torch.optim.Optimizer)
         opt.zero_grad()
 
@@ -162,29 +154,30 @@ class JLUTrainer(pl.LightningModule):
         # Note that y_secondary_ is a list of outputs.
         y_primary_, *y_secondary_ = self.model(xb)
 
+        if not self.y_primary_weights.is_cuda:
+            self.y_primary_weights = self.y_primary_weights.to(self.device)
+
         # Calculate the primary loss
-        lp = F.cross_entropy(
-            y_primary_, y_primary, self.y_primary_weights.to(self.device)
-        )
-        self.log(f"loss/lp", lp, on_step=True, on_epoch=True, prog_bar=True)
+        lp = F.cross_entropy(y_primary_, y_primary, self.y_primary_weights)
+        self.log(f"loss/lp", lp, prog_bar=True)
 
         # Calculate the confusion losses.
         lconfs = torch.stack([self.uniform_kldiv(ys_) for ys_ in y_secondary_])
         for i, lconf_m in enumerate(lconfs):
-            self.log(f"loss/lconf/{i}", lconf_m, on_step=True, on_epoch=True)
+            self.log(f"loss/lconf/{i}", lconf_m)
 
         lconf = lconfs.sum()
-        self.log(f"loss/lconf", lconf, on_step=True, on_epoch=True, prog_bar=True)
+        self.log(f"loss/lconf", lconf, prog_bar=True)
 
         # Get the total loss.
         total_loss = lp + (self.alpha * lconf)
-        self.log(
-            f"loss/lp+alconf", total_loss, on_step=True, on_epoch=True, prog_bar=True
-        )
+        self.log(f"loss/lp+alconf", total_loss, prog_bar=True)
 
-        self.manual_backward(total_loss)
+        acc = accuracy(y_primary_.softmax(dim=-1), y_primary)
+        self.log(f"acc", acc, prog_bar=True)
+
+        self.manual_backward(lp)
         opt.step()
-        opt.zero_grad()
 
     def validation_step(self, batch, batch_idx):
         # Get the batch.
@@ -197,7 +190,7 @@ class JLUTrainer(pl.LightningModule):
 
         # Calculate the primary loss
         lp = F.cross_entropy(y_primary_, y_primary)
-        self.log(f"val_loss/lp", lp, on_epoch=True)
+        self.log(f"val_loss/lp", lp)
 
         # Calculate the confusion losses.
         lconfs = torch.stack([self.uniform_kldiv(ys_) for ys_ in y_secondary_])
@@ -211,6 +204,9 @@ class JLUTrainer(pl.LightningModule):
         total_loss = lp + (self.alpha * lconf)
         self.log(f"val_loss/lp+alconf", total_loss)
 
+        acc = accuracy(y_primary_.softmax(dim=-1), y_primary)
+        self.log(f"val_acc", acc, prog_bar=True)
+
         return total_loss
 
     def configure_callbacks(self):
@@ -222,10 +218,14 @@ class JLUTrainer(pl.LightningModule):
         return [early_stopping, checkpoint]
 
     def configure_optimizers(self):
-        optimizer = torch.optim.SGD(self.model.parameters(), lr=self.learning_rate)
-        return optimizer
-        # [
-        #     {"params": self.model.feature_base.parameters()},
-        #     {"params": self.model.primary_task.parameters(), "lr": 1e-3},
-        #     {"params": self.model.secondary_tasks.parameters(), "lr": 1e-3},
-        # ],
+        optimizer_secondary = torch.optim.SGD(
+            self.model.secondary_tasks.parameters(), lr=self.learning_rate
+        )
+        optimizer_primary = torch.optim.Adam(
+            itertools.chain(
+                self.model.primary_task.parameters(),
+                self.model.feature_base.parameters(),
+            ),
+            lr=self.learning_rate,
+        )
+        return [optimizer_primary, optimizer_secondary]
