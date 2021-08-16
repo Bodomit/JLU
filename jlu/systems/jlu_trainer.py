@@ -1,26 +1,29 @@
 import itertools
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
+import numpy as np
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
 from jlu.callbacks import JLUAwareEarlyStopping
-from jlu.data import UTKFace
 from jlu.losses import UniformTargetKLDivergence
 from jlu.models import JLUMultitaskModel
 from pytorch_lightning.callbacks import ModelCheckpoint
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torchmetrics.functional import accuracy
 
 
 class JLUTrainer(pl.LightningModule):
     def __init__(
         self,
-        datamodule: str,
         alpha: float,
         learning_rate: float,
         primary_task: str,
         secondary_task: List[str],
         bootstrap_epochs: int,
+        datamodule_n_classes: np.ndarray,
+        datamodule_labels: List[str],
+        *args,
         grads_near_zero_threshold: float = 1e-5,
         **kwargs,
     ) -> None:
@@ -31,45 +34,28 @@ class JLUTrainer(pl.LightningModule):
 
         self.alpha = alpha
         self.learning_rate = learning_rate
+        self.primary_task = primary_task
+        self.secondary_task = secondary_task
         self.grads_near_zero_threshold = grads_near_zero_threshold
         self.bootstrap_epochs = bootstrap_epochs
+        self.datamodule_n_classes = datamodule_n_classes
         self.ls_grads_are_near_zero = False
         self.train_lp_lconf = False
         self.automatic_optimization = False
-        self.datamodule = self.load_datamodule(datamodule, **kwargs)
-        self.datamodule.setup()
 
         # Get label indexes per task.
-        self.primary_idx: int = self.get_label_index(primary_task)
+        self.primary_idx: int = datamodule_labels.index(self.primary_task)
         self.secondary_idx: List[int] = [
-            self.get_label_index(s) for s in secondary_task
+            datamodule_labels.index(s) for s in self.secondary_task
         ]
         all_idx: List[int] = [self.primary_idx] + self.secondary_idx
 
         # Get the model.
-        n_classes = self.datamodule.n_classes[all_idx]
+        n_classes = self.datamodule_n_classes[all_idx]
         self.model = JLUMultitaskModel(n_classes)
 
         # Store the loss object.
         self.uniform_kldiv = UniformTargetKLDivergence()
-
-        # Get the weights.
-        self.y_primary_weights = torch.tensor(
-            self.datamodule.train.weights_per_label[self.primary_idx], dtype=torch.float
-        )
-        self.y_secondary_weights = [
-            torch.tensor(self.datamodule.train.weights_per_label[i], dtype=torch.float)
-            for i in self.secondary_idx
-        ]
-
-    def load_datamodule(self, datamodule: str, **kwargs) -> pl.LightningDataModule:
-        if datamodule.lower() == "utkface":
-            return UTKFace(**kwargs)
-        else:
-            raise ValueError
-
-    def get_label_index(self, label: str):
-        return self.datamodule.labels.index(label)
 
     def grads_near_zero(self) -> bool:
         grad_total = 0.0
@@ -79,6 +65,19 @@ class JLUTrainer(pl.LightningModule):
 
         result = bool(grad_total < self.grads_near_zero_threshold)
         return result
+
+    def on_fit_start(self) -> None:
+        # Get the weights.
+        self.y_primary_weights = torch.tensor(
+            self.trainer.datamodule.train.weights_per_label[self.primary_idx],
+            dtype=torch.float,
+        )
+        self.y_secondary_weights = [
+            torch.tensor(
+                self.trainer.datamodule.train.weights_per_label[i], dtype=torch.float
+            )
+            for i in self.secondary_idx
+        ]
 
     def on_epoch_start(self) -> None:
         super().on_epoch_start()
@@ -93,11 +92,13 @@ class JLUTrainer(pl.LightningModule):
         if self.current_epoch < self.bootstrap_epochs:
             self.train_lp_lconf = True
 
-    def on_epoch_end(self) -> None:
-        super().on_epoch_end()
-        # If current epoch was training lp and lconf
+    def training_epoch_end(self, outputs) -> None:
+        schedulers: List[Any] = self.lr_schedulers()  # type: ignore
+
+        # If current epoch was training lp and backbone
         # reset ls_grads_are_near_zero flag.
         if self.train_lp_lconf:
+            schedulers[0].step(self.trainer.callback_metrics["loss/lp+alconf"])
             self.ls_grads_are_near_zero = False
 
     def training_step(self, batch, batch_idx, optimizer_idx):
@@ -176,7 +177,7 @@ class JLUTrainer(pl.LightningModule):
         acc = accuracy(y_primary_.softmax(dim=-1), y_primary)
         self.log(f"acc", acc, prog_bar=True)
 
-        self.manual_backward(lp)
+        self.manual_backward(total_loss)
         opt.step()
 
     def validation_step(self, batch, batch_idx):
@@ -233,4 +234,14 @@ class JLUTrainer(pl.LightningModule):
                 },
             ]
         )
-        return [optimizer_primary, optimizer_secondary]
+        return [
+            {
+                "optimizer": optimizer_primary,
+                "lr_scheduler": {
+                    "scheduler": ReduceLROnPlateau(optimizer_primary, patience=10),
+                },
+            },
+            {
+                "optimizer": optimizer_secondary,
+            },
+        ]
