@@ -24,7 +24,8 @@ class JLUTrainer(pl.LightningModule):
         datamodule_n_classes: np.ndarray,
         datamodule_labels: List[str],
         *args,
-        grads_near_zero_threshold: float = 1e-5,
+        ls_average_n_steps: int = 10,
+        ls_is_best_patentice: int = 100,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -36,10 +37,13 @@ class JLUTrainer(pl.LightningModule):
         self.learning_rate = learning_rate
         self.primary_task = primary_task
         self.secondary_task = secondary_task
-        self.grads_near_zero_threshold = grads_near_zero_threshold
         self.bootstrap_epochs = bootstrap_epochs
         self.datamodule_n_classes = datamodule_n_classes
-        self.ls_grads_are_near_zero = False
+
+        self.ls_average_n_steps = ls_average_n_steps
+        self.ls_is_best_patentice = ls_is_best_patentice
+
+        self.ls_is_best = False
         self.train_lp_lconf = False
         self.automatic_optimization = False
 
@@ -57,15 +61,6 @@ class JLUTrainer(pl.LightningModule):
         # Store the loss object.
         self.uniform_kldiv = UniformTargetKLDivergence()
 
-    def grads_near_zero(self) -> bool:
-        grad_total = 0.0
-        for param in (p for p in self.model.parameters() if p.grad is not None):
-            assert param.grad is not None
-            grad_total += param.grad.abs().sum()
-
-        result = bool(grad_total < self.grads_near_zero_threshold)
-        return result
-
     def on_fit_start(self) -> None:
         # Get the weights.
         self.y_primary_weights = torch.tensor(
@@ -79,11 +74,18 @@ class JLUTrainer(pl.LightningModule):
             for i in self.secondary_idx
         ]
 
-    def on_epoch_start(self) -> None:
-        super().on_epoch_start()
-        # If the ls grads were are near zero on last epoch
-        # train lp and lconf.
-        if self.ls_grads_are_near_zero:
+    def on_train_epoch_start(self) -> None:
+        super().on_train_epoch_start()
+
+        # Reset ls early stopping.
+        self.ls_loss_average_buffer = torch.zeros(
+            self.ls_average_n_steps, device=self.device
+        )
+        self.ls_is_best_patentice_counter = 0
+        self.ls_is_best_current_best = None
+
+        # If the ls is best possible train lp and lconf.
+        if self.ls_is_best:
             self.train_lp_lconf = True
         else:
             # Else train ls until grads are near zero.
@@ -92,16 +94,17 @@ class JLUTrainer(pl.LightningModule):
         if self.current_epoch < self.bootstrap_epochs:
             self.train_lp_lconf = True
 
-    def training_epoch_end(self, outputs) -> None:
-        schedulers: List[Any] = self.lr_schedulers()  # type: ignore
+    def on_train_epoch_end(self, unused=None):
+        scheduler: ReduceLROnPlateau = self.lr_schedulers()  # type: ignore
+        assert isinstance(scheduler, ReduceLROnPlateau)
 
         # If current epoch was training lp and backbone
         # reset ls_grads_are_near_zero flag.
         if self.train_lp_lconf:
-            schedulers[0].step(self.trainer.callback_metrics["loss/lp+alconf"])
-            self.ls_grads_are_near_zero = False
+            scheduler.step(self.trainer.callback_metrics["loss/lp+alconf"])
+            self.ls_is_best = False
 
-    def training_step(self, batch, batch_idx, optimizer_idx):
+    def training_step(self, batch, batch_idx):
         if self.train_lp_lconf:
             self.training_step_Lp_Lconf(batch, batch_idx)
         else:
@@ -112,7 +115,7 @@ class JLUTrainer(pl.LightningModule):
     ) -> Optional[int]:
         super().on_train_batch_start(batch, batch_idx, dataloader_idx)
         # Stops the epoch early grads are near zero.
-        if self.ls_grads_are_near_zero and not self.train_lp_lconf:
+        if self.ls_is_best and not self.train_lp_lconf:
             return -1
 
     def training_step_Ls(self, batch, batch_idx):
@@ -138,9 +141,31 @@ class JLUTrainer(pl.LightningModule):
 
         self.manual_backward(ls)
 
-        self.ls_grads_are_near_zero = self.grads_near_zero()
+        loss_average = self.average_loss_over_steps(ls, batch_idx)
+        if batch_idx > self.ls_average_n_steps:
+            self.ls_is_best = self.ls_is_best_check(loss_average)
+        else:
+            self.ls_is_best = False
 
         opt.step()
+
+    def average_loss_over_steps(self, loss: torch.Tensor, batch_idx: int):
+        idx = batch_idx % self.ls_average_n_steps
+        self.ls_loss_average_buffer[idx] = loss
+        return self.ls_loss_average_buffer.mean()
+
+    def ls_is_best_check(self, average: torch.Tensor) -> bool:
+        if self.ls_is_best_current_best is None:
+            self.ls_is_best_current_best = average
+            return False
+
+        if average < self.ls_is_best_current_best:
+            self.ls_is_best_patentice_counter = 0
+            self.ls_is_best_current_best = average
+            return False
+
+        self.ls_is_best_patentice_counter += 1
+        return self.ls_is_best_patentice_counter > self.ls_is_best_patentice
 
     def training_step_Lp_Lconf(self, batch, batch_idx):
         opt = self.optimizers()[0]  # type: ignore

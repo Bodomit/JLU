@@ -37,7 +37,7 @@ def main(hparams):
     trainer.fit(model, datamodule)
 
 
-def load_datamodule(datamodule: str, **kwargs) -> pl.LightningDataModule:
+def load_datamodule(datamodule: str, **kwargs) -> UTKFace:
     if datamodule.lower() == "utkface":
         return UTKFace(**kwargs)
     else:
@@ -51,9 +51,9 @@ if __name__ == "__main__":
     parser.add_argument("--primary-task", "-p", default="age")
     parser.add_argument("--secondary-task", "-s", default=["sex"], action="append")
     parser.add_argument("--alpha", "-a", default=0.1, type=float)
-    parser.add_argument("--learning-rate", "-lr", default=1e-5, type=float)
+    parser.add_argument("--learning-rate", "-lr", default=1e-6, type=float)
     parser.add_argument("--batch-size", "-b", default=32, type=int)
-    parser.add_argument("--bootstrap-epochs", default=10, type=int)
+    parser.add_argument("--bootstrap-epochs", default=0, type=int)
     hyperparams = parser.parse_args()
 
     main(hyperparams)
