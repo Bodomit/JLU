@@ -33,6 +33,7 @@ def main(hparams):
         benchmark=True,
         logger=True,
         max_epochs=sys.maxsize,
+        resume_from_checkpoint=hparams.resume_from,
     )
 
     # Train
@@ -56,6 +57,7 @@ if __name__ == "__main__":
     parser.add_argument("--learning-rate", "-lr", default=1e-6, type=float)
     parser.add_argument("--batch-size", "-b", default=32, type=int)
     parser.add_argument("--bootstrap-epochs", default=0, type=int)
+    parser.add_argument("--resume-from", default=None, type=str)
     hyperparams = parser.parse_args()
 
     main(hyperparams)
