@@ -1,4 +1,5 @@
 import os
+import sys
 from argparse import ArgumentParser
 
 import pytorch_lightning as pl
@@ -31,6 +32,7 @@ def main(hparams):
         log_every_n_steps=50,
         benchmark=True,
         logger=True,
+        max_epochs=sys.maxsize,
     )
 
     # Train
