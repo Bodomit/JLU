@@ -5,10 +5,14 @@ from typing import List, Optional, Set, Tuple
 import numpy as np
 import PIL
 import pytorch_lightning as pl
-import torch
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
+from torchvision.transforms.transforms import (
+    RandomAffine,
+    RandomCrop,
+    RandomResizedCrop,
+)
 
 from .utils import parse_dataset_dir, read_filenames
 
@@ -45,7 +49,12 @@ class UTKFace(pl.LightningDataModule):
             ]
         )
         train_transforms = transforms.Compose(
-            [common_transforms, transforms.RandomHorizontalFlip(p=0.5)]
+            [
+                common_transforms,
+                transforms.RandomAffine(degrees=(-30, 30), translate=(0.1, 0.1)),
+                transforms.RandomResizedCrop(size=(image_size)),
+                transforms.RandomHorizontalFlip(p=0.5),
+            ]
         )
         val_transforms = common_transforms
         test_transforms = common_transforms
