@@ -4,8 +4,7 @@ from argparse import ArgumentParser
 
 import pytorch_lightning as pl
 
-from jlu.callbacks import JLUAwareEarlyStopping
-from jlu.data import UTKFace
+from jlu.data import UTKFace, load_datamodule
 from jlu.systems import JLUTrainer
 
 
@@ -38,13 +37,6 @@ def main(hparams):
 
     # Train
     trainer.fit(model, datamodule)
-
-
-def load_datamodule(datamodule: str, **kwargs) -> UTKFace:
-    if datamodule.lower() == "utkface":
-        return UTKFace(**kwargs)
-    else:
-        raise ValueError
 
 
 if __name__ == "__main__":
