@@ -3,6 +3,7 @@ from argparse import ArgumentParser
 
 import pytorch_lightning as pl
 
+from jlu.data import VGGFace2, load_datamodule
 from jlu.systems import VggMPretrainer
 
 
@@ -10,8 +11,12 @@ def main(hparams):
     # Create results directory.
     os.makedirs(hparams.output_directory, exist_ok=True)
 
+    # Get datamodelule.
+    datamodule: VGGFace2 = load_datamodule(**vars(hparams))
+    datamodule.setup()
+
     # Construct model.
-    model = VggMPretrainer(**vars(hparams))
+    model = VggMPretrainer(**vars(hparams), n_classes=datamodule.n_classes)
 
     # Get Trainer.
     trainer = pl.Trainer(
@@ -25,14 +30,14 @@ def main(hparams):
     )
 
     # Train
-    trainer.fit(model)
+    trainer.fit(model, datamodule)
 
 
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("output_directory")
     parser.add_argument("--datamodule", "-d", default="VggFace2")
-    parser.add_argument("--learning-rate", "-lr", default=1e-4, type=float)
+    parser.add_argument("--learning-rate", "-lr", default=1e-3, type=float)
     parser.add_argument("--batch-size", "-b", default=32, type=int)
     hyperparams = parser.parse_args()
 
