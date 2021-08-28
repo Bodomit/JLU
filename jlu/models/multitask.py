@@ -3,6 +3,7 @@ from typing import List
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
+from torch.nn.modules.container import Sequential
 
 from .vgg_m import VggMBase
 

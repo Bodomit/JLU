@@ -9,7 +9,10 @@ class JLUAwareEarlyStopping(EarlyStopping):
         self, trainer: Trainer, pl_module: LightningModule, *args
     ) -> None:
 
-        if pl_module.train_lp_lconf:
+        if (
+            pl_module.train_lp_lconf
+            and trainer.current_epoch < pl_module.bootstrap_epochs
+        ):  # type :ignore
             return super().on_train_epoch_end(trainer, pl_module)
         else:
             return

@@ -142,16 +142,6 @@ class UTKFace(pl.LightningDataModule):
             n_classes.append(len(np.unique(arr[:, i])))
         return np.array(n_classes)
 
-    @staticmethod
-    def calculate_class_weights(arr: np.ndarray) -> List[np.ndarray]:
-        n_weights: List[np.ndarray] = []
-        n_cols = arr.shape[1]
-
-        for i in range(n_cols):
-            n_classes_count = np.unique(arr[:, i], return_counts=True)
-
-        return n_weights
-
 
 class UTKFaceDataset(Dataset):
     def __init__(self, x: np.ndarray, y: np.ndarray, transform) -> None:
