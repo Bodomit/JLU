@@ -60,6 +60,8 @@ if __name__ == "__main__":
     parser.add_argument("--bootstrap-epochs", default=0, type=int)
     parser.add_argument("--resume-from", default=None, type=str)
     parser.add_argument("--pretrained", default=None, type=str)
+    parser.add_argument("--random-affine", action="store_true")
+    parser.add_argument("--random-crop", action="store_true")
     hyperparams = parser.parse_args()
 
     main(hyperparams)
