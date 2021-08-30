@@ -1,7 +1,6 @@
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
-from jlu.data.vggface2 import VGGFace2
 from jlu.models import VggMClassification
 from pytorch_lightning.callbacks import (
     EarlyStopping,

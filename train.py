@@ -6,6 +6,7 @@ import pytorch_lightning as pl
 
 from jlu.data import UTKFace, load_datamodule
 from jlu.systems import JLUTrainer
+from jlu.systems.vggm_pretrainer import VggMPretrainer
 
 
 def main(hparams):
@@ -16,9 +17,17 @@ def main(hparams):
     datamodule: UTKFace = load_datamodule(**vars(hparams))
     datamodule.setup()
 
+    if hparams.pretrained:
+        pretrained_model = VggMPretrainer.load_from_checkpoint(hparams.pretrained)
+        pretrained_base = pretrained_model.model.base
+        pretrained_base = pretrained_base
+    else:
+        pretrained_base = None
+
     # Construct model.
     model = JLUTrainer(
         **vars(hparams),
+        pretrained_base=pretrained_base,
         datamodule_n_classes=datamodule.n_classes,
         datamodule_labels=datamodule.labels
     )
@@ -50,6 +59,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch-size", "-b", default=32, type=int)
     parser.add_argument("--bootstrap-epochs", default=0, type=int)
     parser.add_argument("--resume-from", default=None, type=str)
+    parser.add_argument("--pretrained", default=None, type=str)
     hyperparams = parser.parse_args()
 
     main(hyperparams)

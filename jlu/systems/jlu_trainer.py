@@ -1,4 +1,3 @@
-import itertools
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -23,13 +22,15 @@ class JLUTrainer(pl.LightningModule):
         bootstrap_epochs: int,
         datamodule_n_classes: np.ndarray,
         datamodule_labels: List[str],
+        pretrained: str,
+        pretrained_base: Optional[pl.LightningModule],
         *args,
-        ls_average_n_steps: int = 10,
-        ls_is_best_patentice: int = 100,
+        ls_average_n_steps: int = 5,
+        ls_is_best_patentice: int = 50,
         **kwargs,
     ) -> None:
         super().__init__()
-        self.save_hyperparameters()
+        self.save_hyperparameters(ignore="pretrained_base")
 
         assert alpha >= 0
 
@@ -56,7 +57,7 @@ class JLUTrainer(pl.LightningModule):
 
         # Get the model.
         n_classes = self.datamodule_n_classes[all_idx]
-        self.model = JLUMultitaskModel(n_classes)
+        self.model = JLUMultitaskModel(n_classes, pretrained_base)
 
         # Store the loss object.
         self.uniform_kldiv = UniformTargetKLDivergence()
@@ -266,7 +267,5 @@ class JLUTrainer(pl.LightningModule):
                     "scheduler": ReduceLROnPlateau(optimizer_primary, patience=10),
                 },
             },
-            {
-                "optimizer": optimizer_secondary,
-            },
+            {"optimizer": optimizer_secondary,},
         ]

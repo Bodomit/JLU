@@ -1,22 +1,26 @@
-from typing import List
+from typing import List, Optional
 
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
-from torch.nn.modules.container import Sequential
 
 from .vgg_m import VggMBase
 
 
 class JLUMultitaskModel(pl.LightningModule):
-    def __init__(self, n_classes: List[int], feature_length=4096):
+    def __init__(self, n_classes: List[int], pretrained_base: Optional[pl.LightningModule], feature_length=4096):
         super().__init__()
         self.feature_length = feature_length
 
         assert len(n_classes) >= 2
         n_primary, *n_secondaries = n_classes
 
-        self.feature_base = VggMBase()
+        if pretrained_base:
+            self.feature_base = pretrained_base
+            for p in self.feature_base.features.parameters():
+                p.requires_grad = False
+        else:
+            self.feature_base = VggMBase()
         self.primary_task = nn.Linear(self.feature_length, n_primary)
         self.secondary_tasks = self.construct_secondaries(n_secondaries)
 
