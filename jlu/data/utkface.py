@@ -8,11 +8,6 @@ import pytorch_lightning as pl
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
-from torchvision.transforms.transforms import (
-    RandomAffine,
-    RandomCrop,
-    RandomResizedCrop,
-)
 
 from .utils import parse_dataset_dir, read_filenames
 
@@ -24,6 +19,8 @@ class UTKFace(pl.LightningDataModule):
     def __init__(
         self,
         batch_size: int,
+        random_affine: bool,
+        random_crop: bool,
         dataset_dir="UTKFace",
         image_size=(224, 224),
         test_split=0.1,
@@ -48,14 +45,15 @@ class UTKFace(pl.LightningDataModule):
                 transforms.Resize(image_size),
             ]
         )
-        train_transforms = transforms.Compose(
-            [
-                common_transforms,
-                transforms.RandomAffine(degrees=(-30, 30), translate=(0.1, 0.1)),
-                transforms.RandomResizedCrop(size=(image_size)),
-                transforms.RandomHorizontalFlip(p=0.5),
-            ]
-        )
+        
+        train_transforms_list = [common_transforms]
+        if random_affine:
+            train_transforms_list.append(transforms.RandomAffine(degrees=(-30, 30), translate=(0.1, 0.1)))
+        if random_crop:
+            train_transforms_list.append(transforms.RandomResizedCrop(size=(image_size)))
+        train_transforms_list.append(transforms.RandomHorizontalFlip(p=0.5))
+        train_transforms = transforms.Compose(train_transforms_list)
+        
         val_transforms = common_transforms
         test_transforms = common_transforms
 
