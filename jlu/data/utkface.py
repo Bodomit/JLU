@@ -1,6 +1,6 @@
 import os
 import re
-from typing import List, Optional, Set, Tuple
+from typing import Any, List, Optional, Set, Tuple
 
 import numpy as np
 import PIL
@@ -21,6 +21,7 @@ class UTKFace(pl.LightningDataModule):
         batch_size: int,
         random_affine: bool,
         random_crop: bool,
+        stratification_label="age",
         dataset_dir="UTKFace",
         image_size=(224, 224),
         test_split=0.1,
@@ -37,6 +38,8 @@ class UTKFace(pl.LightningDataModule):
 
         self.labels = ["age", "sex", "race"]
 
+        self.stratification_index = self.labels.index(stratification_label)
+
         # Define the transformations.
         common_transforms = transforms.Compose(
             [
@@ -45,15 +48,16 @@ class UTKFace(pl.LightningDataModule):
                 transforms.Resize(image_size),
             ]
         )
-        
-        train_transforms_list = [common_transforms]
+
+        train_transforms_list: List[Any] = [common_transforms]
         if random_affine:
-            train_transforms_list.append(transforms.RandomAffine(degrees=(-30, 30), translate=(0.1, 0.1)))
+            train_transforms_list.append(
+                transforms.RandomAffine(degrees=(-30, 30), translate=(0.1, 0.1)))
         if random_crop:
             train_transforms_list.append(transforms.RandomResizedCrop(size=(image_size)))
         train_transforms_list.append(transforms.RandomHorizontalFlip(p=0.5))
         train_transforms = transforms.Compose(train_transforms_list)
-        
+
         val_transforms = common_transforms
         test_transforms = common_transforms
 
@@ -84,11 +88,15 @@ class UTKFace(pl.LightningDataModule):
             self.y = np.vstack((age_bin, sex, race)).T
 
         # Calculate train, validation, test splits.
+        stratification_labels = self.y[:, self.stratification_index] if self.stratification_index is not None else None
         train_x, val_test_x, train_y, val_test_y = train_test_split(
-            self.x, self.y, train_size=self.train_split, random_state=42
+            self.x, self.y, train_size=self.train_split, random_state=42,
+            stratify=stratification_labels
         )
 
         val_test_ratio = self.val_split / (self.val_split + self.test_split)
+        assert isinstance(val_test_y, np.ndarray)
+        stratification_labels = val_test_y[:, self.stratification_index] if self.stratification_index is not None else None
         valid_x, test_x, valid_y, test_y = train_test_split(
             val_test_x, val_test_y, train_size=val_test_ratio
         )
@@ -112,8 +120,6 @@ class UTKFace(pl.LightningDataModule):
 
         # Store the number of classes per label.
         self.n_classes = self.get_unique_in_columns(self.y)
-
-        # Calculate the weights per class per label per split.
 
     def train_dataloader(self):
         return DataLoader(
