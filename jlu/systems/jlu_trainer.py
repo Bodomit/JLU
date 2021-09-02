@@ -261,7 +261,11 @@ class JLUTrainer(pl.LightningModule):
                     "lr": self.learning_rate,
                 },
             ],
+<<<<<<< HEAD
             lr=self.learning_rate,
+=======
+            lr=self.learning_rate
+>>>>>>> Revert to SGD.
         )
         return [
             {
