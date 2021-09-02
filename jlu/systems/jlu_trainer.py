@@ -246,10 +246,10 @@ class JLUTrainer(pl.LightningModule):
         return [early_stopping, checkpoint]
 
     def configure_optimizers(self):
-        optimizer_secondary = torch.optim.Adam(
+        optimizer_secondary = torch.optim.SGD(
             self.model.secondary_tasks.parameters(), lr=self.learning_rate * 10
         )
-        optimizer_primary = torch.optim.Adam(
+        optimizer_primary = torch.optim.SGD(
             [
                 {
                     "params": self.model.primary_task.parameters(),
@@ -259,7 +259,8 @@ class JLUTrainer(pl.LightningModule):
                     "params": self.model.feature_base.parameters(),
                     "lr": self.learning_rate,
                 },
-            ]
+            ],
+            lr=self.learning_rate
         )
         return [
             {
@@ -268,5 +269,5 @@ class JLUTrainer(pl.LightningModule):
                     "scheduler": ReduceLROnPlateau(optimizer_primary, patience=10),
                 },
             },
-            {"optimizer": optimizer_secondary,},
+            {"optimizer": optimizer_secondary},
         ]
