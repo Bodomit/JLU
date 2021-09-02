@@ -24,6 +24,7 @@ class JLUTrainer(pl.LightningModule):
         datamodule_labels: List[str],
         pretrained: str,
         pretrained_base: Optional[pl.LightningModule],
+        dropout: float,
         *args,
         ls_average_n_steps: int = 5,
         ls_is_best_patentice: int = 50,
@@ -57,7 +58,7 @@ class JLUTrainer(pl.LightningModule):
 
         # Get the model.
         n_classes = self.datamodule_n_classes[all_idx]
-        self.model = JLUMultitaskModel(n_classes, pretrained_base)
+        self.model = JLUMultitaskModel(n_classes, pretrained_base, dropout=dropout)
 
         # Store the loss object.
         self.uniform_kldiv = UniformTargetKLDivergence()

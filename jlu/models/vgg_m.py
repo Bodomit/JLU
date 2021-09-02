@@ -4,7 +4,7 @@ import torch.nn as nn
 
 
 class VggMBase(pl.LightningModule):
-    def __init__(self):
+    def __init__(self, dropout: float = 0.5):
         super().__init__()
 
         self.features = nn.Sequential(
@@ -35,11 +35,11 @@ class VggMBase(pl.LightningModule):
             # FC6
             nn.Linear(512 * 6 * 6, 4096),
             nn.ReLU(True),
-            nn.Dropout(),
+            nn.Dropout(p=dropout),
             # FC7
             nn.Linear(4096, 4096),
             nn.ReLU(True),
-            nn.Dropout(),
+            nn.Dropout(p=dropout),
         )
 
     def forward(self, x):

@@ -8,7 +8,7 @@ from .vgg_m import VggMBase
 
 
 class JLUMultitaskModel(pl.LightningModule):
-    def __init__(self, n_classes: List[int], pretrained_base: Optional[pl.LightningModule], feature_length=4096):
+    def __init__(self, n_classes: List[int], pretrained_base: Optional[pl.LightningModule], dropout=0.5, feature_length=4096):
         super().__init__()
         self.feature_length = feature_length
 
@@ -20,7 +20,7 @@ class JLUMultitaskModel(pl.LightningModule):
             for p in self.feature_base.features.parameters():
                 p.requires_grad = False
         else:
-            self.feature_base = VggMBase()
+            self.feature_base = VggMBase(dropout=dropout)
         self.primary_task = nn.Linear(self.feature_length, n_primary)
         self.secondary_tasks = self.construct_secondaries(n_secondaries)
 

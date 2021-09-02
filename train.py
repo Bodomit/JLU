@@ -62,6 +62,7 @@ if __name__ == "__main__":
     parser.add_argument("--pretrained", default=None, type=str)
     parser.add_argument("--random-affine", action="store_true")
     parser.add_argument("--random-crop", action="store_true")
+    parser.add_argument("--dropout", default=0.5, type=float)
     hyperparams = parser.parse_args()
 
     main(hyperparams)
