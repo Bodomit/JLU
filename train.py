@@ -14,7 +14,8 @@ def main(hparams):
     os.makedirs(hparams.output_directory, exist_ok=True)
 
     # Get datamodelule.
-    datamodule: UTKFace = load_datamodule(**vars(hparams))
+    datamodule = load_datamodule(**vars(hparams))
+    assert isinstance(datamodule, UTKFace)
     datamodule.setup()
 
     if hparams.pretrained:
@@ -63,6 +64,7 @@ if __name__ == "__main__":
     parser.add_argument("--random-affine", action="store_true")
     parser.add_argument("--random-crop", action="store_true")
     parser.add_argument("--dropout", default=0.5, type=float)
+    parser.add_argument("--primary-only", action="store_true")
     hyperparams = parser.parse_args()
 
     main(hyperparams)

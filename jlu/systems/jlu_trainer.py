@@ -25,6 +25,7 @@ class JLUTrainer(pl.LightningModule):
         pretrained: str,
         pretrained_base: Optional[pl.LightningModule],
         dropout: float,
+        primary_only: bool,
         *args,
         ls_average_n_steps: int = 5,
         ls_is_best_patentice: int = 50,
@@ -41,6 +42,7 @@ class JLUTrainer(pl.LightningModule):
         self.secondary_task = secondary_task
         self.bootstrap_epochs = bootstrap_epochs
         self.datamodule_n_classes = datamodule_n_classes
+        self.primary_only = primary_only
 
         self.ls_average_n_steps = ls_average_n_steps
         self.ls_is_best_patentice = ls_is_best_patentice
@@ -94,6 +96,9 @@ class JLUTrainer(pl.LightningModule):
             self.train_lp_lconf = False
 
         if self.current_epoch < self.bootstrap_epochs:
+            self.train_lp_lconf = True
+
+        if self.primary_only:
             self.train_lp_lconf = True
 
     def on_train_epoch_end(self, unused=None):
@@ -204,7 +209,11 @@ class JLUTrainer(pl.LightningModule):
         acc = accuracy(y_primary_.softmax(dim=-1), y_primary)
         self.log(f"acc", acc, prog_bar=True)
 
-        self.manual_backward(total_loss)
+        if self.primary_only:
+            self.manual_backward(lp)
+        else:
+            self.manual_backward(total_loss)
+
         opt.step()
 
     def validation_step(self, batch, batch_idx):
@@ -246,10 +255,10 @@ class JLUTrainer(pl.LightningModule):
         return [early_stopping, checkpoint]
 
     def configure_optimizers(self):
-        optimizer_secondary = torch.optim.Adam(
+        optimizer_secondary = torch.optim.SGD(
             self.model.secondary_tasks.parameters(), lr=self.learning_rate * 10
         )
-        optimizer_primary = torch.optim.Adam(
+        optimizer_primary = torch.optim.SGD(
             [
                 {
                     "params": self.model.primary_task.parameters(),
@@ -259,7 +268,8 @@ class JLUTrainer(pl.LightningModule):
                     "params": self.model.feature_base.parameters(),
                     "lr": self.learning_rate,
                 },
-            ]
+            ],
+            lr=self.learning_rate
         )
         return [
             {
@@ -268,5 +278,5 @@ class JLUTrainer(pl.LightningModule):
                     "scheduler": ReduceLROnPlateau(optimizer_primary, patience=10),
                 },
             },
-            {"optimizer": optimizer_secondary,},
+            {"optimizer": optimizer_secondary},
         ]
