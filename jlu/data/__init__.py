@@ -6,7 +6,7 @@ from .vggface2 import VGGFace2
 from .vggface2_maadface import VGGFace2WithMaadFace
 
 
-def load_datamodule(datamodule: str, **kwargs) -> Union[UTKFace, VGGFace2, FairFace]:
+def load_datamodule(datamodule: str, **kwargs):
     if datamodule.lower() == "utkface":
         return UTKFace(**kwargs)
     elif datamodule.lower() == "vggface2":
