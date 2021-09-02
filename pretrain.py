@@ -12,11 +12,11 @@ def main(hparams):
     os.makedirs(hparams.output_directory, exist_ok=True)
 
     # Get datamodelule.
-    datamodule: VGGFace2 = load_datamodule(**vars(hparams))
+    datamodule = load_datamodule(**vars(hparams))
     datamodule.setup()
 
     # Construct model.
-    model = VggMPretrainer(**vars(hparams), n_classes=datamodule.n_classes)
+    model = VggMPretrainer(**vars(hparams), n_classes=int(datamodule.n_classes))
 
     # Get Trainer.
     trainer = pl.Trainer(
