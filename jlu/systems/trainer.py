@@ -27,7 +27,7 @@ class Trainer(pl.LightningModule):
         **kwargs,
     ):
         super().__init__()
-        self.save_hyperparameters()
+        self.save_hyperparameters(ignore=["pretrained_base"])
 
         self.learning_rate = learning_rate
         self.primary_task = primary_task
@@ -43,18 +43,20 @@ class Trainer(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         x, y = batch
-        y_ = self.model(x)
-        loss = F.cross_entropy(y_, y)
-        acc = accuracy(y_.softmax(dim=-1), y)
+        y_primary = y[:, self.primary_idx]
+        y_ = self.model(x)[0]
+        loss = F.cross_entropy(y_, y_primary)
+        acc = accuracy(y_.softmax(dim=-1), y_primary)
         self.log("loss", loss)
         self.log("acc", acc, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
-        y_ = self.model(x)
-        loss = F.cross_entropy(y_, y)
-        acc = accuracy(y_.softmax(dim=-1), y)
+        y_primary = y[:, self.primary_idx]
+        y_ = self.model(x)[0]
+        loss = F.cross_entropy(y_, y_primary)
+        acc = accuracy(y_.softmax(dim=-1), y_primary)
         self.log("val_loss", loss, prog_bar=True)
         self.log("val_acc", acc, prog_bar=True)
         return loss
@@ -77,5 +79,4 @@ class Trainer(pl.LightningModule):
     def configure_callbacks(self):
         early_stopping = EarlyStopping(monitor="val_loss", patience=20)
         checkpoint = ModelCheckpoint(monitor="val_loss", save_last=True, save_top_k=1)
-        lr_monitor = LearningRateMonitor()
-        return [early_stopping, checkpoint, lr_monitor]
+        return [early_stopping, checkpoint]

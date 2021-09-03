@@ -28,8 +28,10 @@ def main(hparams):
 
     # Construct model.
     if hparams.primary_only:
+        max_epochs = 100
         system_class = Trainer
     else:
+        max_epochs = sys.maxsize
         system_class = JLUTrainer
 
     system = system_class(
@@ -47,7 +49,7 @@ def main(hparams):
         log_every_n_steps=50,
         benchmark=True,
         logger=True,
-        max_epochs=sys.maxsize,
+        max_epochs=max_epochs,
         resume_from_checkpoint=hparams.resume_from,
     )
 
