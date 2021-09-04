@@ -39,6 +39,8 @@ if __name__ == "__main__":
     parser.add_argument("--datamodule", "-d", default="VggFace2")
     parser.add_argument("--learning-rate", "-lr", default=1e-3, type=float)
     parser.add_argument("--batch-size", "-b", default=32, type=int)
+    parser.add_argument("--random-affine", action="store_true")
+    parser.add_argument("--random-crop", action="store_true")
     hyperparams = parser.parse_args()
 
     main(hyperparams)

@@ -1,7 +1,7 @@
 import glob
 import os
 import re
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import PIL
@@ -19,6 +19,8 @@ class VGGFace2(pl.LightningDataModule):
         dataset_dir="vggface2_MTCNN",
         image_size=(224, 224),
         val_split=0.1,
+        random_affine=False,
+        random_crop=False,
         **kwargs
     ):
 
@@ -36,9 +38,19 @@ class VGGFace2(pl.LightningDataModule):
                 transforms.Resize(image_size),
             ]
         )
-        train_transforms = transforms.Compose(
-            [common_transforms, transforms.RandomHorizontalFlip(p=0.5)]
-        )
+
+        train_transforms_list: List[Any] = [common_transforms]
+        if random_affine:
+            train_transforms_list.append(
+                transforms.RandomAffine(degrees=(-30, 30), translate=(0.1, 0.1))
+            )
+        if random_crop:
+            train_transforms_list.append(
+                transforms.RandomResizedCrop(size=(image_size))
+            )
+        train_transforms_list.append(transforms.RandomHorizontalFlip(p=0.5))
+        train_transforms = transforms.Compose(train_transforms_list)
+
         val_transforms = common_transforms
         test_transforms = common_transforms
 
@@ -154,9 +166,7 @@ class VGGFace2Dataset(Dataset):
         return c
 
     @staticmethod
-    def calc_weights(
-        support: np.ndarray,
-    ) -> np.ndarray:
+    def calc_weights(support: np.ndarray,) -> np.ndarray:
         weights = 1 / support
         weights = weights / weights.sum() * len(weights)
         return weights
