@@ -23,7 +23,7 @@ LR_ID=${SLURM_ARRAY_TASK_ID:-0}
 
 echo "ALPHA_ID: $ALPHA_ID"
 
-LRS=(1e-4 1e-3 1e-5 1e-6 1e-2)
+LRS=(1e-4 1e-3 1e-2)
 LR=${LRS[$LR_ID]}
 
 RESULTSDIR=$RESULTS_ROOT_DIR/jlu-train-primary/$LR

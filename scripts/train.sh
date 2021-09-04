@@ -41,3 +41,7 @@ echo ""
 
 srun python -m train $RESULTSDIR -b 128 --pretrained $PRETRAINED_PATH -lr $LR
 
+srun python -m train $RESULTSDIR -b 128 --pretrained $PRETRAINED_PATH -lr $LR --random-affine
+
+srun python -m train $RESULTSDIR -b 128 --pretrained $PRETRAINED_PATH -lr $LR --random-crop
+

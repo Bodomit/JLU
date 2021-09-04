@@ -62,7 +62,7 @@ class Trainer(pl.LightningModule):
         return loss
 
     def configure_optimizers(self):
-        return torch.optim.SGD(
+        primary_optimizer = torch.optim.SGD(
             [
                 {
                     "params": self.model.primary_task.parameters(),
@@ -75,8 +75,20 @@ class Trainer(pl.LightningModule):
             ],
             lr=self.learning_rate,
         )
+        return (
+            {
+                "optimizer": primary_optimizer,
+                "lr_scheduler": {
+                    "scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau(
+                        primary_optimizer, patience=5
+                    ),
+                    "monitor": "loss",
+                },
+            },
+        )
 
     def configure_callbacks(self):
         early_stopping = EarlyStopping(monitor="val_loss", patience=20)
         checkpoint = ModelCheckpoint(monitor="val_loss", save_last=True, save_top_k=1)
-        return [early_stopping, checkpoint]
+        lr_monitor = LearningRateMonitor()
+        return [early_stopping, checkpoint, lr_monitor]

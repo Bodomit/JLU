@@ -28,7 +28,7 @@ def main(hparams):
 
     # Construct model.
     if hparams.primary_only:
-        max_epochs = 100
+        max_epochs = 1000
         system_class = Trainer
     else:
         max_epochs = sys.maxsize
