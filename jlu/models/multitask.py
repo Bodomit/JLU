@@ -3,6 +3,7 @@ from typing import List, Optional
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
+from torch.nn.modules.module import Module
 
 from .vgg_m import VggMBase
 
@@ -12,13 +13,31 @@ class JLUMultitaskModel(pl.LightningModule):
         super().__init__()
         self.feature_length = feature_length
 
-        assert len(n_classes) >= 2
-        n_primary, *n_secondaries = n_classes
+        try:
+            assert len(n_classes) >= 2
+            n_primary, *n_secondaries = n_classes
+        except AssertionError:
+            n_primary = n_classes[0]
+            n_secondaries = []
 
         if pretrained_base:
             self.feature_base = pretrained_base
+
+            assert isinstance(self.feature_base.features, Module)
+
+            # Freeze all the CNN layers of the pretrained model.
             for p in self.feature_base.features.parameters():
                 p.requires_grad = False
+
+            # Reset all the parameters in the fully connected layers.
+            assert isinstance(self.feature_base.fully_connected, Module)
+            for c in self.feature_base.fully_connected.children():
+                if hasattr(c, "reset_parameters"):
+                    c.reset_parameters()  # type: ignore
+
+            # Set the dropout layers in the pretrained model to use new probability.
+            self.feature_base.fully_connected[3].p = dropout  # type: ignore
+            self.feature_base.fully_connected[5].p = dropout  # type: ignore
         else:
             self.feature_base = VggMBase(dropout=dropout)
         self.primary_task = nn.Linear(self.feature_length, n_primary)

@@ -6,6 +6,7 @@ import pytorch_lightning as pl
 
 from jlu.data import UTKFace, load_datamodule
 from jlu.systems import JLUTrainer
+from jlu.systems.trainer import Trainer
 from jlu.systems.vggm_pretrainer import VggMPretrainer
 
 
@@ -26,7 +27,14 @@ def main(hparams):
         pretrained_base = None
 
     # Construct model.
-    model = JLUTrainer(
+    if hparams.primary_only:
+        max_epochs = 100
+        system_class = Trainer
+    else:
+        max_epochs = sys.maxsize
+        system_class = JLUTrainer
+
+    system = system_class(
         **vars(hparams),
         pretrained_base=pretrained_base,
         datamodule_n_classes=datamodule.n_classes,
@@ -41,12 +49,12 @@ def main(hparams):
         log_every_n_steps=50,
         benchmark=True,
         logger=True,
-        max_epochs=sys.maxsize,
+        max_epochs=max_epochs,
         resume_from_checkpoint=hparams.resume_from,
     )
 
     # Train
-    trainer.fit(model, datamodule)
+    trainer.fit(system, datamodule)
 
 
 if __name__ == "__main__":
