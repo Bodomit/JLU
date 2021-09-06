@@ -9,7 +9,13 @@ from .vgg_m import VggMBase
 
 
 class JLUMultitaskModel(pl.LightningModule):
-    def __init__(self, n_classes: List[int], pretrained_base: Optional[pl.LightningModule], dropout=0.5, feature_length=4096):
+    def __init__(
+        self,
+        n_classes: List[int],
+        pretrained_base: Optional[pl.LightningModule],
+        dropout=0.5,
+        feature_length=4096,
+    ):
         super().__init__()
         self.feature_length = feature_length
 
