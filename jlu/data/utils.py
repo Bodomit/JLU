@@ -1,7 +1,8 @@
 import os
 import warnings
-from typing import Set
+from typing import List, Set
 
+import numpy as np
 import ruyaml as yaml
 
 
@@ -29,3 +30,11 @@ def read_filenames(path: str) -> Set[str]:
     image_absdir = os.path.join(path)
     filenames = set([f.path for f in os.scandir(image_absdir)])
     return filenames
+
+
+def get_unique_in_columns(arr: np.ndarray) -> np.ndarray:
+    n_classes: List[int] = []
+    n_cols = arr.shape[1]
+    for i in range(n_cols):
+        n_classes.append(len(np.unique(arr[:, i])))
+    return np.array(n_classes)
