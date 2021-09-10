@@ -145,9 +145,10 @@ class VGGFace2Dataset(Dataset):
         self.x = x
         self.y = y
         self.transform = transform
-        self.n_classes = len(np.unique(y))
-        self.support_per_class = self.calc_support(self.y)
-        self.weights_per_class = self.calc_weights(self.support_per_class)
+        self.support_per_label = self.calc_support_for_labels(self.y)
+        self.weights_per_label = self.calc_weights_for_classes_per_label(
+            self.support_per_label
+        )
 
         assert len(self.x) == len(self.y)
 
@@ -161,12 +162,21 @@ class VGGFace2Dataset(Dataset):
         return len(self.x)
 
     @staticmethod
-    def calc_support(labels: np.ndarray) -> np.ndarray:
-        _, c = np.unique(labels, return_counts=True)
-        return c
+    def calc_support_for_labels(labels: np.ndarray) -> List[np.ndarray]:
+        support_per_label: List[np.ndarray] = []
+        for i in range(labels.shape[1]):
+            _, c = np.unique(labels[:, i], return_counts=True)
+            support_per_label.append(c)
+        return support_per_label
 
     @staticmethod
-    def calc_weights(support: np.ndarray,) -> np.ndarray:
-        weights = 1 / support
-        weights = weights / weights.sum() * len(weights)
-        return weights
+    def calc_weights_for_classes_per_label(
+        support_per_label: List[np.ndarray],
+    ) -> List[np.ndarray]:
+        weights_per_label: List[np.ndarray] = []
+        for support in support_per_label:
+            weights = 1 / support
+            weights = weights / weights.sum() * len(weights)
+            weights_per_label.append(weights)
+
+        return weights_per_label
