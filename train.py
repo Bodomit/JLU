@@ -36,8 +36,8 @@ def main(hparams):
     system = system_class(
         **vars(hparams),
         pretrained_base=pretrained_base,
-        datamodule_n_classes=datamodule.n_classes,
-        datamodule_labels=datamodule.labels
+        datamodule_n_classes=datamodule.n_classes,  # type: ignore
+        datamodule_labels=datamodule.labels  # type: ignore
     )
 
     # Get Trainer.

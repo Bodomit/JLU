@@ -106,11 +106,13 @@ class JLUTrainer(pl.LightningModule):
             self.train_lp_lconf = True
 
         if self.train_lp_lconf:
-            self.log("epoch/lp_lconf", self.epoch_lp_lconf, prog_bar=True)
+            self.log(
+                "epoch/lp_lconf", self.epoch_lp_lconf, prog_bar=True  # type: ignore
+            )
             self.epoch_lp_lconf += 1
             print("Training lp_lconf")
         else:
-            self.log("epoch/ls", self.epoch_ls, prog_bar=True)
+            self.log("epoch/ls", self.epoch_ls, prog_bar=True)  # type: ignore
             self.epoch_ls += 1
 
     def on_train_epoch_end(self):
