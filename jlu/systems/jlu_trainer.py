@@ -65,6 +65,10 @@ class JLUTrainer(pl.LightningModule):
         # Store the loss object.
         self.uniform_kldiv = UniformTargetKLDivergence()
 
+        # Store the number of epochs lp_lconf is minimised.
+        self.epoch_lp_lconf = 0
+        self.epoch_ls = 0
+
     def on_fit_start(self) -> None:
         # Get the weights.
         self.y_primary_weights = torch.tensor(
@@ -100,6 +104,14 @@ class JLUTrainer(pl.LightningModule):
 
         if self.primary_only:
             self.train_lp_lconf = True
+
+        if self.train_lp_lconf:
+            self.log("epoch/lp_lconf", self.epoch_lp_lconf, prog_bar=True)
+            self.epoch_lp_lconf += 1
+            print("Training lp_lconf")
+        else:
+            self.log("epoch/ls", self.epoch_ls, prog_bar=True)
+            self.epoch_ls += 1
 
     def on_train_epoch_end(self, unused=None):
         scheduler: ReduceLROnPlateau = self.lr_schedulers()  # type: ignore
@@ -144,7 +156,7 @@ class JLUTrainer(pl.LightningModule):
             y_secondary_losses[i] = ys_loss
 
         ls = torch.sum(y_secondary_losses)
-        self.log("loss/ls", ls, prog_bar=True)
+        self.log("loss/ls", ls)
 
         self.manual_backward(ls)
 
@@ -192,22 +204,22 @@ class JLUTrainer(pl.LightningModule):
 
         # Calculate the primary loss
         lp = F.cross_entropy(y_primary_, y_primary, self.y_primary_weights)
-        self.log(f"loss/lp", lp, prog_bar=True)
+        self.log(f"loss/lp", lp, on_epoch=True)
 
         # Calculate the confusion losses.
         lconfs = torch.stack([self.uniform_kldiv(ys_) for ys_ in y_secondary_])
         for i, lconf_m in enumerate(lconfs):
-            self.log(f"loss/lconf/{i}", lconf_m)
+            self.log(f"loss/lconf/{i}", lconf_m, on_epoch=True)
 
         lconf = lconfs.sum()
-        self.log(f"loss/lconf", lconf, prog_bar=True)
+        self.log(f"loss/lconf", lconf, on_epoch=True)
 
         # Get the total loss.
         total_loss = lp + (self.alpha * lconf)
-        self.log(f"loss/lp+alconf", total_loss, prog_bar=True)
+        self.log(f"loss/lp+alconf", total_loss)
 
         acc = accuracy(y_primary_.softmax(dim=-1), y_primary)
-        self.log(f"acc", acc, prog_bar=True)
+        self.log(f"acc", acc, on_epoch=True)
 
 <<<<<<< HEAD
         self.manual_backward(total_loss)
@@ -246,7 +258,7 @@ class JLUTrainer(pl.LightningModule):
         self.log(f"val_loss/lp+alconf", total_loss)
 
         acc = accuracy(y_primary_.softmax(dim=-1), y_primary)
-        self.log(f"val_acc", acc, prog_bar=True)
+        self.log(f"val_acc", acc)
 
         return total_loss
 
