@@ -115,16 +115,22 @@ class JLUTrainer(pl.LightningModule):
             self.log("epoch/ls", self.epoch_ls, prog_bar=True)  # type: ignore
             self.epoch_ls += 1
 
-    def on_train_epoch_end(self):
+    def on_validation_end(self):
+
         schedulers: List[ReduceLROnPlateau] = self.lr_schedulers()  # type: ignore
 
-        # If current epoch was training lp and backbone
-        # reset ls_grads_are_near_zero flag.
-        if self.train_lp_lconf:
-            schedulers[0].step(self.trainer.callback_metrics["loss/lp+alconf"])
-            self.ls_is_best = False
-        else:
-            schedulers[1].step(self.trainer.callback_metrics["loss/ls"])
+        # Fails on validation sanity check with key error or handle on epoch 0.
+        try:
+            # If current epoch was training lp and backbone
+            # reset ls_is_best. Also step LR schedulers.
+            if self.train_lp_lconf:
+                schedulers[0].step(self.trainer.callback_metrics["loss/lp+alconf"])
+                self.ls_is_best = False
+            else:
+                schedulers[1].step(self.trainer.callback_metrics["loss/ls"])
+        except KeyError:
+            if self.current_epoch > 0:
+                raise
 
     def training_step(self, batch, batch_idx):
         if self.train_lp_lconf:
