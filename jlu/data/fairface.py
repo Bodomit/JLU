@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 import PIL
 import pytorch_lightning as pl
-import torch
 from jlu.data.utils import get_unique_in_columns, parse_dataset_dir, read_filenames
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
