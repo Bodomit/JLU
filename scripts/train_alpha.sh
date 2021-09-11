@@ -9,7 +9,7 @@
 #SBATCH --time=3-0
 #SBATCH --signal=SIGUSR1@90
 
-# Invoke with sbatch --array=0-3 ./scripts/train.sh $RESULTS_ROOT_DIR $PRETRAINED_PATH
+# Invoke with sbatch --array=0-7 ./scripts/train_alpha.sh $RESULTS_ROOT_DIR $PRETRAINED_PATH
 
 module add nvidia-cuda
 
@@ -39,5 +39,5 @@ echo "GPU Stats:"
 nvidia-smi
 echo ""
 
-srun python -m train $RESULTSDIR -b 128 --pretrained $PRETRAINED_PATH -lr $LR
+srun python -m train $RESULTSDIR -b 128 --pretrained $PRETRAINED_PATH --alpha $ALPHA
 
