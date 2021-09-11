@@ -4,8 +4,7 @@ from argparse import ArgumentParser
 
 import pytorch_lightning as pl
 
-from jlu.data import UTKFace, load_datamodule
-from jlu.data.fairface import FairFace
+from jlu.data import load_datamodule
 from jlu.systems import JLUTrainer
 from jlu.systems.trainer import Trainer
 from jlu.systems.vggm_pretrainer import VggMPretrainer
@@ -17,8 +16,7 @@ def main(hparams):
 
     # Get datamodelule.
     datamodule = load_datamodule(**vars(hparams))
-    assert isinstance(datamodule, (UTKFace, FairFace))
-    datamodule.setup()
+    datamodule.setup(None)
 
     if hparams.pretrained:
         pretrained_model = VggMPretrainer.load_from_checkpoint(hparams.pretrained)
@@ -61,8 +59,8 @@ def main(hparams):
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("output_directory")
-    parser.add_argument("--datamodule", "-d", default="FairFace")
-    parser.add_argument("--primary-task", "-p", default="age")
+    parser.add_argument("--datamodule", "-d", default="vggface2_maadface")
+    parser.add_argument("--primary-task", "-p", default="id")
     parser.add_argument("--secondary-task", "-s", default=["sex"], action="append")
     parser.add_argument("--alpha", "-a", default=0.1, type=float)
     parser.add_argument("--learning-rate", "-lr", default=1e-4, type=float)
