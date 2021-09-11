@@ -63,7 +63,7 @@ if __name__ == "__main__":
     parser.add_argument("--primary-task", "-p", default="age")
     parser.add_argument("--secondary-task", "-s", default=["sex"], action="append")
     parser.add_argument("--alpha", "-a", default=0.1, type=float)
-    parser.add_argument("--learning-rate", "-lr", default=1e-3, type=float)
+    parser.add_argument("--learning-rate", "-lr", default=1e-4, type=float)
     parser.add_argument("--batch-size", "-b", default=32, type=int)
     parser.add_argument("--bootstrap-epochs", default=0, type=int)
     parser.add_argument("--resume-from", default=None, type=str)

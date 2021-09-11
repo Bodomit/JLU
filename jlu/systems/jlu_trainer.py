@@ -282,7 +282,7 @@ class JLUTrainer(pl.LightningModule):
 
     def configure_optimizers(self):
         optimizer_secondary = torch.optim.Adam(
-            self.model.secondary_tasks.parameters(), lr=self.learning_rate
+            self.model.secondary_tasks.parameters(), lr=self.learning_rate * 10
         )
         optimizer_primary = torch.optim.Adam(
             [
