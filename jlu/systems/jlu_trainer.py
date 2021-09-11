@@ -230,14 +230,7 @@ class JLUTrainer(pl.LightningModule):
         acc = accuracy(y_primary_.softmax(dim=-1), y_primary)
         self.log(f"acc", acc, on_epoch=True)
 
-<<<<<<< HEAD
         self.manual_backward(total_loss)
-=======
-        if self.primary_only:
-            self.manual_backward(lp)
-        else:
-            self.manual_backward(total_loss)
->>>>>>> Primary only mode.
 
         opt.step()
 
