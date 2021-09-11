@@ -86,8 +86,12 @@ class VGGFace2(pl.LightningDataModule):
             assert isinstance(val_y, np.ndarray)
 
             self.n_classes = len(np.unique(np.concatenate((train_y, val_y))))
-            self.train = VGGFace2Dataset(train_x, train_y, self.train_transforms)
-            self.valid = VGGFace2Dataset(val_x, val_y, self.val_transforms)
+            self.train = VGGFace2Dataset(
+                train_x, np.expand_dims(train_y, axis=1), self.train_transforms
+            )
+            self.valid = VGGFace2Dataset(
+                val_x, np.expand_dims(val_y, axis=1), self.val_transforms
+            )
 
         if stage == "test" or stage is None:
             self.test_filenames = list(
@@ -103,7 +107,9 @@ class VGGFace2(pl.LightningDataModule):
             self.test_label_map = self.get_label_map(test_y)
             test_y = np.array(list(self.test_label_map[y] for y in test_y))
 
-            self.test = VGGFace2Dataset(test_x, test_y, self.val_transforms)
+            self.test = VGGFace2Dataset(
+                test_x, np.expand_dims(test_y, axis=1), self.test_transforms
+            )
 
     @staticmethod
     def parse_filenames(filenames: List[str]):

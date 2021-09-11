@@ -20,6 +20,7 @@ class VggMPretrainer(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         x, y = batch
+        y = y.squeeze()
         y_ = self.model(x)
         loss = F.cross_entropy(y_, y)
         acc = accuracy(y_.softmax(dim=-1), y)
@@ -29,6 +30,7 @@ class VggMPretrainer(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
+        y = y.squeeze()
         y_ = self.model(x)
         loss = F.cross_entropy(y_, y)
         acc = accuracy(y_.softmax(dim=-1), y)
