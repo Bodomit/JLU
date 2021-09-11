@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from jlu.callbacks import JLUAwareEarlyStopping
 from jlu.losses import UniformTargetKLDivergence
 from jlu.models import JLUMultitaskModel
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torchmetrics.functional import accuracy
 
@@ -113,15 +113,16 @@ class JLUTrainer(pl.LightningModule):
             self.log("epoch/ls", self.epoch_ls, prog_bar=True)
             self.epoch_ls += 1
 
-    def on_train_epoch_end(self, unused=None):
-        scheduler: ReduceLROnPlateau = self.lr_schedulers()  # type: ignore
-        assert isinstance(scheduler, ReduceLROnPlateau)
+    def on_train_epoch_end(self):
+        schedulers: List[ReduceLROnPlateau] = self.lr_schedulers()  # type: ignore
 
         # If current epoch was training lp and backbone
         # reset ls_grads_are_near_zero flag.
         if self.train_lp_lconf:
-            scheduler.step(self.trainer.callback_metrics["loss/lp+alconf"])
+            schedulers[0].step(self.trainer.callback_metrics["loss/lp+alconf"])
             self.ls_is_best = False
+        else:
+            schedulers[1].step(self.trainer.callback_metrics["loss/ls"])
 
     def training_step(self, batch, batch_idx):
         if self.train_lp_lconf:
@@ -268,13 +269,14 @@ class JLUTrainer(pl.LightningModule):
         checkpoint = ModelCheckpoint(
             monitor="val_loss/lp+alconf", save_last=True, save_top_k=3
         )
-        return [early_stopping, checkpoint]
+        learning_rate = LearningRateMonitor()
+        return [early_stopping, checkpoint, learning_rate]
 
     def configure_optimizers(self):
-        optimizer_secondary = torch.optim.SGD(
-            self.model.secondary_tasks.parameters(), lr=self.learning_rate * 10
+        optimizer_secondary = torch.optim.Adam(
+            self.model.secondary_tasks.parameters(), lr=self.learning_rate
         )
-        optimizer_primary = torch.optim.SGD(
+        optimizer_primary = torch.optim.Adam(
             [
                 {
                     "params": self.model.primary_task.parameters(),
@@ -285,7 +287,7 @@ class JLUTrainer(pl.LightningModule):
                     "lr": self.learning_rate,
                 },
             ],
-            lr=self.learning_rate
+            lr=self.learning_rate,
         )
         return [
             {
@@ -294,5 +296,10 @@ class JLUTrainer(pl.LightningModule):
                     "scheduler": ReduceLROnPlateau(optimizer_primary, patience=10),
                 },
             },
-            {"optimizer": optimizer_secondary},
+            {
+                "optimizer": optimizer_secondary,
+                "lr_scheduler": {
+                    "scheduler": ReduceLROnPlateau(optimizer_primary, patience=10),
+                },
+            },
         ]
