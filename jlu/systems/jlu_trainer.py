@@ -27,8 +27,8 @@ class JLUTrainer(pl.LightningModule):
         dropout: float,
         primary_only: bool,
         *args,
-        ls_average_n_steps: int = 5,
-        ls_is_best_patentice: int = 50,
+        ls_average_n_steps: int = 1,
+        ls_is_best_patentice: int = 100,
         **kwargs,
     ) -> None:
         super().__init__()
