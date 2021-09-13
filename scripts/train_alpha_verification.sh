@@ -9,7 +9,7 @@
 #SBATCH --time=3-0
 #SBATCH --signal=SIGUSR1@90
 
-# Invoke with sbatch --array=0-7 ./scripts/train_alpha_verification.sh $RESULTS_ROOT_DIR $PRETRAINED_PATH
+# Invoke with sbatch --array=0-5 ./scripts/train_alpha_verification.sh $RESULTS_ROOT_DIR $PRETRAINED_PATH
 
 module add nvidia-cuda
 
@@ -23,10 +23,10 @@ ALPHA_ID=${SLURM_ARRAY_TASK_ID:-0}
 
 echo "ALPHA_ID: $ALPHA_ID"
 
-ALPHAS=(0 0.01 0.1 0.3 0.5 0.7 0.9 0.99)
+ALPHAS=(0 0.01 0.1 1 10 100 )
 ALPHA=${ALPHAS[$ALPHA_ID]}
 
-RESULTSDIR=$RESULTS_ROOT_DIR/jlu-train/alphas/$ALPHA
+RESULTSDIR=$RESULTS_ROOT_DIR/jlu-train/verification_alphas/$ALPHA
 
 echo "ALPHA: $ALPHA"
 echo "RESULTSDIR: $RESULTSDIR"
@@ -39,5 +39,5 @@ echo "GPU Stats:"
 nvidia-smi
 echo ""
 
-srun python -m train $RESULTSDIR -b 128 --pretrained $PRETRAINED_PATH --alpha $ALPHA -d vggface_maadface -p id
+srun python -m train $RESULTSDIR -b 128 --pretrained $PRETRAINED_PATH --alpha $ALPHA -d vggface2_maadface -p id
 
