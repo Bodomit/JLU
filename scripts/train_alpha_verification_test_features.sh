@@ -3,7 +3,7 @@
 #SBATCH --partition=k2-gpu
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=64GB
+#SBATCH --mem=200GB
 #SBATCH --gres=gpu:1
 #SBATCH --output=/mnt/scratch2/users/40057686/logs/jlu-train/%A-%a.log
 #SBATCH --time=3-0
