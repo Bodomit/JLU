@@ -2,7 +2,7 @@ from jlu.data.fairface import FairFace
 
 from .fairface import FairFace
 from .utkface import UTKFace
-from .vggface2 import VGGFace2
+from .vggface2 import VGGFace2, VGGFace2Dataset
 from .vggface2_maadface import VGGFace2WithMaadFace
 
 
