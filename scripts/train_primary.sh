@@ -39,5 +39,5 @@ echo "GPU Stats:"
 nvidia-smi
 echo ""
 
-srun python -m train $RESULTSDIR --primary-only -b 128 --pretrained $PRETRAINED_PATH -lr $LR
+srun python -m train $RESULTSDIR --primary-only -b 128 --pretrained $PRETRAINED_PATH -lr $LR --random-crop
 
