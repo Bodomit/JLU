@@ -74,12 +74,26 @@ def main(
 
         print(f"Dataset Module: {dataset_name}")
 
-        cluster(experiment_path, dataset_name, test_dataloader, feature_model, device)
+        cluster(
+            experiment_path,
+            dataset_name,
+            test_dataloader,
+            feature_model,
+            device,
+            is_debug=is_debug,
+        )
 
         if cluster_only:
             continue
 
-        visualise(experiment_path, dataset_name, test_dataloader, feature_model, device)
+        visualise(
+            experiment_path,
+            dataset_name,
+            test_dataloader,
+            feature_model,
+            device,
+            is_debug=is_debug,
+        )
 
         n_class_schedule = [10] + list(
             n_classes_scheduler(len(test_dataset.classes))
@@ -118,6 +132,7 @@ def cluster(
     feature_model: torch.nn.Module,
     device: torch.device,
     perplexity=50,
+    is_debug=False,
 ):
 
     results_dir = os.path.join(
@@ -133,7 +148,7 @@ def cluster(
     for x, y in tqdm.tqdm(
         test_dataloader, desc="Clustering - Embeddings", dynamic_ncols=True
     ):
-        a = y[attribute_index]
+        a = y[:, attribute_index]
         x_ = feature_model(x.to(device))
 
         if isinstance(x_, tuple):
@@ -141,6 +156,9 @@ def cluster(
 
         embeddings_per_batch.append(x_.cpu().detach().numpy())
         attributes_per_batch.append(a.cpu().detach().numpy())
+
+        if is_debug:
+            break
 
     all_embeddings = np.concatenate(embeddings_per_batch)
     all_attributes = np.concatenate(attributes_per_batch).squeeze()
@@ -204,8 +222,8 @@ def cluster(
 
     # Plot female.
     ax.plot(
-        scaled_data[male_mask is False][:, 0],
-        scaled_data[male_mask is False][:, 1],
+        scaled_data[male_mask == np.array(False)][:, 0],
+        scaled_data[male_mask == np.array(False)][:, 1],
         "+",
         markersize=2,
         c="red",
@@ -243,7 +261,7 @@ def cluster(
         full_data["cluster_id"], full_data["true_attribute"]
     )
 
-    opposite_cluster_ids = (full_data["cluster_id"] is False).astype(int)
+    opposite_cluster_ids = (full_data["cluster_id"] == np.array(False)).astype(int)
     cluster_1_is_att_0_metrics = calc_metrics(
         opposite_cluster_ids, full_data["true_attribute"]
     )
@@ -263,6 +281,7 @@ def visualise(
     feature_model: torch.nn.Module,
     device: torch.device,
     perplexity=30,
+    is_debug=False,
 ):
 
     results_dir = os.path.join(
@@ -272,9 +291,12 @@ def visualise(
 
     embeddings_per_batch: List[np.ndarray] = []
     attributes_per_batch: List[np.ndarray] = []
-    for x, (_, a) in tqdm.tqdm(
+    attribute_index = test_dataloader.dataset.labels.index("sex")
+
+    for x, y in tqdm.tqdm(
         test_dataloader, desc="Visualiser - Embeddings", dynamic_ncols=True
     ):
+        a = y[:, attribute_index]
         x_ = feature_model(x.to(device))
 
         if isinstance(x_, tuple):
@@ -282,6 +304,9 @@ def visualise(
 
         embeddings_per_batch.append(x_.cpu().detach().numpy())
         attributes_per_batch.append(a.cpu().detach().numpy())
+
+        if is_debug:
+            break
 
     all_embeddings = np.concatenate(embeddings_per_batch)
     all_attributes = np.concatenate(attributes_per_batch)
