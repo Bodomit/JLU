@@ -6,9 +6,9 @@ import numpy as np
 import pandas
 import pytorch_lightning as pl
 from jlu.data.utils import get_unique_in_columns, parse_dataset_dir
+from torch.utils.data import DataLoader
 from torchvision import transforms
 from torchvision.datasets import ImageFolder
-from torch.utils.data import DataLoader
 
 from .vggface2 import VGGFace2Dataset
 
@@ -76,14 +76,14 @@ class VGGFace2WithMaadFace(pl.LightningDataModule):
         attributes.columns = ["sex"]
         assert isinstance(attributes, pandas.DataFrame)
 
+        self.labels = ["id", "sex"]
+
         if stage is None or stage == "fit":
             self.train, self.valid = self._process_train_valid(attributes)
             self.n_classes = get_unique_in_columns(self.train.y)
 
         if stage is None or stage == "test":
             self.test = self._process_test(attributes)
-
-        self.labels = ["id", "sex"]
 
         super().setup(stage)
 
@@ -205,7 +205,7 @@ class VGGFace2WithMaadFace(pl.LightningDataModule):
             (np.expand_dims(local_identities, axis=1), attributes_), axis=1
         )
 
-        return VGGFace2Dataset(X, Y, transform)
+        return VGGFace2Dataset(X, Y, transform, self.labels)
 
     @staticmethod
     def get_val_set_classes(

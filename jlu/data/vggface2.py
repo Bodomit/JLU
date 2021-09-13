@@ -87,10 +87,10 @@ class VGGFace2(pl.LightningDataModule):
 
             self.n_classes = len(np.unique(np.concatenate((train_y, val_y))))
             self.train = VGGFace2Dataset(
-                train_x, np.expand_dims(train_y, axis=1), self.train_transforms
+                train_x, np.expand_dims(train_y, axis=1), self.train_transforms, ["id"]
             )
             self.valid = VGGFace2Dataset(
-                val_x, np.expand_dims(val_y, axis=1), self.val_transforms
+                val_x, np.expand_dims(val_y, axis=1), self.val_transforms, ["id"]
             )
 
         if stage == "test" or stage is None:
@@ -108,7 +108,7 @@ class VGGFace2(pl.LightningDataModule):
             test_y = np.array(list(self.test_label_map[y] for y in test_y))
 
             self.test = VGGFace2Dataset(
-                test_x, np.expand_dims(test_y, axis=1), self.test_transforms
+                test_x, np.expand_dims(test_y, axis=1), self.test_transforms, ["id"]
             )
 
     @staticmethod
@@ -146,7 +146,9 @@ class VGGFace2(pl.LightningDataModule):
 
 
 class VGGFace2Dataset(Dataset):
-    def __init__(self, x: np.ndarray, y: np.ndarray, transform) -> None:
+    def __init__(
+        self, x: np.ndarray, y: np.ndarray, transform, labels: List[str]
+    ) -> None:
         super().__init__()
         self.x = x
         self.y = y
@@ -155,7 +157,7 @@ class VGGFace2Dataset(Dataset):
         self.weights_per_label = self.calc_weights_for_classes_per_label(
             self.support_per_label
         )
-
+        self.labels = labels
         assert len(self.x) == len(self.y)
 
     def __getitem__(self, index):
