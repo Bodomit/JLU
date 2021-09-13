@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from jlu.callbacks import JLUAwareEarlyStopping
 from jlu.losses import UniformTargetKLDivergence
 from jlu.models import JLUMultitaskModel
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torchmetrics.functional import accuracy
 
@@ -25,9 +25,10 @@ class JLUTrainer(pl.LightningModule):
         pretrained: str,
         pretrained_base: Optional[pl.LightningModule],
         dropout: float,
+        primary_only: bool,
         *args,
-        ls_average_n_steps: int = 5,
-        ls_is_best_patentice: int = 50,
+        ls_average_n_steps: int = 1,
+        ls_is_best_patentice: int = 100,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -41,6 +42,7 @@ class JLUTrainer(pl.LightningModule):
         self.secondary_task = secondary_task
         self.bootstrap_epochs = bootstrap_epochs
         self.datamodule_n_classes = datamodule_n_classes
+        self.primary_only = primary_only
 
         self.ls_average_n_steps = ls_average_n_steps
         self.ls_is_best_patentice = ls_is_best_patentice
@@ -62,6 +64,10 @@ class JLUTrainer(pl.LightningModule):
 
         # Store the loss object.
         self.uniform_kldiv = UniformTargetKLDivergence()
+
+        # Store the number of epochs lp_lconf is minimised.
+        self.epoch_lp_lconf = 0
+        self.epoch_ls = 0
 
     def on_fit_start(self) -> None:
         # Get the weights.
@@ -96,15 +102,35 @@ class JLUTrainer(pl.LightningModule):
         if self.current_epoch < self.bootstrap_epochs:
             self.train_lp_lconf = True
 
-    def on_train_epoch_end(self, unused=None):
-        scheduler: ReduceLROnPlateau = self.lr_schedulers()  # type: ignore
-        assert isinstance(scheduler, ReduceLROnPlateau)
+        if self.primary_only:
+            self.train_lp_lconf = True
 
-        # If current epoch was training lp and backbone
-        # reset ls_grads_are_near_zero flag.
         if self.train_lp_lconf:
-            scheduler.step(self.trainer.callback_metrics["loss/lp+alconf"])
-            self.ls_is_best = False
+            self.log(
+                "epoch/lp_lconf", self.epoch_lp_lconf, prog_bar=True  # type: ignore
+            )
+            self.epoch_lp_lconf += 1
+            print("Training lp_lconf")
+        else:
+            self.log("epoch/ls", self.epoch_ls, prog_bar=True)  # type: ignore
+            self.epoch_ls += 1
+
+    def on_validation_end(self):
+
+        schedulers: List[ReduceLROnPlateau] = self.lr_schedulers()  # type: ignore
+
+        # Fails on validation sanity check with key error or handle on epoch 0.
+        try:
+            # If current epoch was training lp and backbone
+            # reset ls_is_best. Also step LR schedulers.
+            if self.train_lp_lconf:
+                schedulers[0].step(self.trainer.callback_metrics["loss/lp+alconf"])
+                self.ls_is_best = False
+            else:
+                schedulers[1].step(self.trainer.callback_metrics["loss/ls"])
+        except KeyError:
+            if self.current_epoch > 0:
+                raise
 
     def training_step(self, batch, batch_idx):
         if self.train_lp_lconf:
@@ -139,7 +165,7 @@ class JLUTrainer(pl.LightningModule):
             y_secondary_losses[i] = ys_loss
 
         ls = torch.sum(y_secondary_losses)
-        self.log("loss/ls", ls, prog_bar=True)
+        self.log("loss/ls", ls)
 
         self.manual_backward(ls)
 
@@ -187,22 +213,22 @@ class JLUTrainer(pl.LightningModule):
 
         # Calculate the primary loss
         lp = F.cross_entropy(y_primary_, y_primary, self.y_primary_weights)
-        self.log(f"loss/lp", lp, prog_bar=True)
+        self.log(f"loss/lp", lp, on_epoch=True)
 
         # Calculate the confusion losses.
         lconfs = torch.stack([self.uniform_kldiv(ys_) for ys_ in y_secondary_])
         for i, lconf_m in enumerate(lconfs):
-            self.log(f"loss/lconf/{i}", lconf_m)
+            self.log(f"loss/lconf/{i}", lconf_m, on_epoch=True)
 
         lconf = lconfs.sum()
-        self.log(f"loss/lconf", lconf, prog_bar=True)
+        self.log(f"loss/lconf", lconf, on_epoch=True)
 
         # Get the total loss.
         total_loss = lp + (self.alpha * lconf)
-        self.log(f"loss/lp+alconf", total_loss, prog_bar=True)
+        self.log(f"loss/lp+alconf", total_loss)
 
         acc = accuracy(y_primary_.softmax(dim=-1), y_primary)
-        self.log(f"acc", acc, prog_bar=True)
+        self.log(f"acc", acc, on_epoch=True)
 
         self.manual_backward(total_loss)
 
@@ -234,7 +260,7 @@ class JLUTrainer(pl.LightningModule):
         self.log(f"val_loss/lp+alconf", total_loss)
 
         acc = accuracy(y_primary_.softmax(dim=-1), y_primary)
-        self.log(f"val_acc", acc, prog_bar=True)
+        self.log(f"val_acc", acc)
 
         return total_loss
 
@@ -244,13 +270,14 @@ class JLUTrainer(pl.LightningModule):
         checkpoint = ModelCheckpoint(
             monitor="val_loss/lp+alconf", save_last=True, save_top_k=3
         )
-        return [early_stopping, checkpoint]
+        learning_rate = LearningRateMonitor()
+        return [early_stopping, checkpoint, learning_rate]
 
     def configure_optimizers(self):
-        optimizer_secondary = torch.optim.SGD(
+        optimizer_secondary = torch.optim.Adam(
             self.model.secondary_tasks.parameters(), lr=self.learning_rate * 10
         )
-        optimizer_primary = torch.optim.SGD(
+        optimizer_primary = torch.optim.Adam(
             [
                 {
                     "params": self.model.primary_task.parameters(),
@@ -270,5 +297,10 @@ class JLUTrainer(pl.LightningModule):
                     "scheduler": ReduceLROnPlateau(optimizer_primary, patience=10),
                 },
             },
-            {"optimizer": optimizer_secondary},
+            {
+                "optimizer": optimizer_secondary,
+                "lr_scheduler": {
+                    "scheduler": ReduceLROnPlateau(optimizer_primary, patience=10),
+                },
+            },
         ]

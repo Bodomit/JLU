@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=JLU-TrainPrimary
+#SBATCH --job-name=JLU-Train
 #SBATCH --partition=k2-gpu
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64GB
 #SBATCH --gres=gpu:1
-#SBATCH --output=/mnt/scratch2/users/40057686/logs/jlu-train-primary/%A-%a.log
+#SBATCH --output=/mnt/scratch2/users/40057686/logs/jlu-train/%A-%a.log
 #SBATCH --time=3-0
 #SBATCH --signal=SIGUSR1@90
 
-# Invoke with sbatch --array=0-4 ./scripts/train_primary.sh $RESULTS_ROOT_DIR $PRETRAINED_PATH
+# Invoke with sbatch --array=0-7 ./scripts/train_alpha.sh $RESULTS_ROOT_DIR $PRETRAINED_PATH
 
 module add nvidia-cuda
 
@@ -19,16 +19,16 @@ echo "RESULTS_ROOT_DIR: $RESULTS_ROOT_DIR"
 PRETRAINED_PATH=$2
 echo "PRETRAINED_PATH: $PRETRAINED_PATH"
 
-LR_ID=${SLURM_ARRAY_TASK_ID:-0}
+ALPHA_ID=${SLURM_ARRAY_TASK_ID:-0}
 
 echo "ALPHA_ID: $ALPHA_ID"
 
-LRS=(1e-4 1e-3 1e-2)
-LR=${LRS[$LR_ID]}
+ALPHAS=(0 0.01 0.1 0.3 0.5 0.7 0.9 0.99)
+ALPHA=${ALPHAS[$ALPHA_ID]}
 
-RESULTSDIR=$RESULTS_ROOT_DIR/jlu-train-primary/$LR
+RESULTSDIR=$RESULTS_ROOT_DIR/jlu-train/alphas/$ALPHA
 
-echo "LR: $LR"
+echo "ALPHA: $ALPHA"
 echo "RESULTSDIR: $RESULTSDIR"
 
 echo "CPU Stats"
@@ -39,5 +39,5 @@ echo "GPU Stats:"
 nvidia-smi
 echo ""
 
-srun python -m train $RESULTSDIR --primary-only -b 128 --pretrained $PRETRAINED_PATH -lr $LR --random-crop
+srun python -m train $RESULTSDIR -b 128 --pretrained $PRETRAINED_PATH --alpha $ALPHA
 

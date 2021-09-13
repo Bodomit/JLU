@@ -11,6 +11,7 @@ from pytorch_lightning.callbacks import (
     ModelCheckpoint,
 )
 from torchmetrics.functional import accuracy
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 
 class Trainer(pl.LightningModule):
@@ -62,7 +63,7 @@ class Trainer(pl.LightningModule):
         return loss
 
     def configure_optimizers(self):
-        primary_optimizer = torch.optim.SGD(
+        optimizer_primary = torch.optim.Adam(
             [
                 {
                     "params": self.model.primary_task.parameters(),
@@ -75,17 +76,13 @@ class Trainer(pl.LightningModule):
             ],
             lr=self.learning_rate,
         )
-        return (
-            {
-                "optimizer": primary_optimizer,
-                "lr_scheduler": {
-                    "scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau(
-                        primary_optimizer, patience=5
-                    ),
-                    "monitor": "loss",
-                },
+        return {
+            "optimizer": optimizer_primary,
+            "lr_scheduler": {
+                "scheduler": ReduceLROnPlateau(optimizer_primary, patience=10),
+                "monitor": "loss",
             },
-        )
+        }
 
     def configure_callbacks(self):
         early_stopping = EarlyStopping(monitor="val_loss", patience=20)

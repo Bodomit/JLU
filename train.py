@@ -36,8 +36,8 @@ def main(hparams):
     system = system_class(
         **vars(hparams),
         pretrained_base=pretrained_base,
-        datamodule_n_classes=datamodule.n_classes,
-        datamodule_labels=datamodule.labels
+        datamodule_n_classes=datamodule.n_classes,  # type: ignore
+        datamodule_labels=datamodule.labels  # type: ignore
     )
 
     # Get Trainer.
@@ -59,8 +59,8 @@ def main(hparams):
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("output_directory")
-    parser.add_argument("--datamodule", "-d", default="vggface2_maadface")
-    parser.add_argument("--primary-task", "-p", default="id")
+    parser.add_argument("--datamodule", "-d", default="FairFace")
+    parser.add_argument("--primary-task", "-p", default="age")
     parser.add_argument("--secondary-task", "-s", default=["sex"], action="append")
     parser.add_argument("--alpha", "-a", default=0.1, type=float)
     parser.add_argument("--learning-rate", "-lr", default=1e-4, type=float)
@@ -70,7 +70,7 @@ if __name__ == "__main__":
     parser.add_argument("--pretrained", default=None, type=str)
     parser.add_argument("--random-affine", action="store_true")
     parser.add_argument("--random-crop", action="store_true")
-    parser.add_argument("--dropout", default=0.5, type=float)
+    parser.add_argument("--dropout", default=0.7, type=float)
     parser.add_argument("--primary-only", action="store_true")
     hyperparams = parser.parse_args()
 
