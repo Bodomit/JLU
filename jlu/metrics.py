@@ -76,10 +76,10 @@ class Verifier:
         samples: Set[AnnotatedSample] = set()
         data_map: Dict[int, np.ndarray] = {}
 
-        for db, (lb, ab) in dataloader:
-            for d, l, a in zip(db, lb, ab):
+        for xb, yb in dataloader:
+            for x, l, a in zip(xb, yb[:, 0], yb[:, 1]):
                 key = len(data_map)
-                data_map[key] = d
+                data_map[key] = x
                 samples.add((key, int(l), int(a)))
 
         return samples, data_map
@@ -565,10 +565,10 @@ class ReidentificationTester:
         samples: Set[AnnotatedSample] = set()
         data_map: Dict[int, np.ndarray] = {}
 
-        for db, (lb, ab) in dataloader:
-            for d, l, a in zip(db, lb, ab):
+        for xb, yb in dataloader:
+            for x, l, a in zip(xb, yb[:, 0], yb[:, 1]):
                 key = len(data_map)
-                data_map[key] = d
+                data_map[key] = x
                 samples.add((key, int(l), int(a)))
 
         return samples, data_map

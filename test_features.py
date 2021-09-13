@@ -95,9 +95,10 @@ def main(
             is_debug=is_debug,
         )
 
+        id_index = test_dataset.labels.index("id")
         n_class_schedule = [10] + list(
-            n_classes_scheduler(len(test_dataset.classes))
-        )  # type: ignore
+            n_classes_scheduler(len(test_dataset.support_per_label[id_index]))
+        )
         for n_classes in n_class_schedule:
 
             print(f"N Classes: {n_classes}")
@@ -158,7 +159,8 @@ def cluster(
         attributes_per_batch.append(a.cpu().detach().numpy())
 
         if is_debug:
-            break
+            if len(np.unique(np.concatenate(attributes_per_batch))) > 1:
+                break
 
     all_embeddings = np.concatenate(embeddings_per_batch)
     all_attributes = np.concatenate(attributes_per_batch).squeeze()
@@ -306,7 +308,8 @@ def visualise(
         attributes_per_batch.append(a.cpu().detach().numpy())
 
         if is_debug:
-            break
+            if len(np.unique(np.concatenate(attributes_per_batch))) > 1:
+                break
 
     all_embeddings = np.concatenate(embeddings_per_batch)
     all_attributes = np.concatenate(attributes_per_batch)
@@ -322,19 +325,21 @@ def visualise(
     )
     reduced_embeddings = tsne.fit_transform(all_embeddings)
 
-    full_data = np.concatenate((reduced_embeddings, all_attributes), axis=1)
+    full_data = np.concatenate(
+        (reduced_embeddings, np.expand_dims(all_attributes, axis=1)), axis=1
+    )
 
     # Save numpy array.
     np.save(os.path.join(results_dir, f"TSNE_p{perplexity}.npy"), reduced_embeddings)
 
     # Save chart.
-    df = pd.DataFrame(data=full_data)
-    columns = [str(c) for c in df.columns.values.tolist()]
+    df = pd.DataFrame(data=full_data, columns=["x", "y", "h"])
+    df["h"] = df["h"].astype(int)
     chart = sns.lmplot(
-        data=df.rename(columns=lambda x: str(x)),
-        x=columns[0],
-        y=columns[1],
-        hue=columns[2],
+        data=df,
+        x="x",
+        y="y",
+        hue="h",
         markers=["x", "+"],
         fit_reg=False,
         scatter_kws={"s": 10},
