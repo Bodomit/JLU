@@ -39,5 +39,5 @@ echo "GPU Stats:"
 nvidia-smi
 echo ""
 
-srun python -m train $RESULTSDIR -b 128 --pretrained $PRETRAINED_PATH --alpha $ALPHA -d vggface2_maadface -p id
+srun python -m features_train $RESULTSDIR -b 128 --pretrained $PRETRAINED_PATH --alpha $ALPHA -d vggface2_maadface -p id
 
