@@ -1,2 +1,3 @@
+from .attribute_extraction import AttributeExtractionModel
 from .multitask import JLUMultitaskModel
 from .vgg_m_classification import VggMClassification

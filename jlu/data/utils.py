@@ -1,7 +1,6 @@
 import os
 import warnings
 from typing import List, Set
-import numpy as np
 
 import numpy as np
 import ruyaml as yaml

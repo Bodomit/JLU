@@ -39,5 +39,5 @@ echo "GPU Stats:"
 nvidia-smi
 echo ""
 
-srun python -m test_features $RESULTSDIR -b 128
+srun python -m features_test $RESULTSDIR -b 128
 
