@@ -4,12 +4,13 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
-import PIL
 import pytorch_lightning as pl
-from jlu.data.utils import parse_dataset_dir, read_filenames
 from sklearn.model_selection import train_test_split
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 from torchvision import transforms
+
+from .common import AttributeDataset
+from .utils import parse_dataset_dir, read_filenames
 
 
 class VGGFace2(pl.LightningDataModule):
@@ -86,10 +87,10 @@ class VGGFace2(pl.LightningDataModule):
             assert isinstance(val_y, np.ndarray)
 
             self.n_classes = len(np.unique(np.concatenate((train_y, val_y))))
-            self.train = VGGFace2Dataset(
+            self.train = AttributeDataset(
                 train_x, np.expand_dims(train_y, axis=1), self.train_transforms, ["id"]
             )
-            self.valid = VGGFace2Dataset(
+            self.valid = AttributeDataset(
                 val_x, np.expand_dims(val_y, axis=1), self.val_transforms, ["id"]
             )
 
@@ -107,7 +108,7 @@ class VGGFace2(pl.LightningDataModule):
             self.test_label_map = self.get_label_map(test_y)
             test_y = np.array(list(self.test_label_map[y] for y in test_y))
 
-            self.test = VGGFace2Dataset(
+            self.test = AttributeDataset(
                 test_x, np.expand_dims(test_y, axis=1), self.test_transforms, ["id"]
             )
 
@@ -143,48 +144,3 @@ class VGGFace2(pl.LightningDataModule):
         return DataLoader(
             self.test, self.batch_size, shuffle=False, num_workers=self.num_workers
         )
-
-
-class VGGFace2Dataset(Dataset):
-    def __init__(
-        self, x: np.ndarray, y: np.ndarray, transform, labels: List[str]
-    ) -> None:
-        super().__init__()
-        self.x = x
-        self.y = y
-        self.transform = transform
-        self.support_per_label = self.calc_support_for_labels(self.y)
-        self.weights_per_label = self.calc_weights_for_classes_per_label(
-            self.support_per_label
-        )
-        self.labels = labels
-        assert len(self.x) == len(self.y)
-
-    def __getitem__(self, index):
-        x = PIL.Image.open(self.x[index])  # type: ignore
-        x = self.transform(x)
-        y = self.y[index]
-        return x, y
-
-    def __len__(self):
-        return len(self.x)
-
-    @staticmethod
-    def calc_support_for_labels(labels: np.ndarray) -> List[np.ndarray]:
-        support_per_label: List[np.ndarray] = []
-        for i in range(labels.shape[1]):
-            _, c = np.unique(labels[:, i], return_counts=True)
-            support_per_label.append(c)
-        return support_per_label
-
-    @staticmethod
-    def calc_weights_for_classes_per_label(
-        support_per_label: List[np.ndarray],
-    ) -> List[np.ndarray]:
-        weights_per_label: List[np.ndarray] = []
-        for support in support_per_label:
-            weights = 1 / support
-            weights = weights / weights.sum() * len(weights)
-            weights_per_label.append(weights)
-
-        return weights_per_label

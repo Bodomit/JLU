@@ -9,6 +9,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 
+from .common import AttributeDataset
 from .utils import get_unique_in_columns, parse_dataset_dir, read_filenames
 
 
@@ -90,6 +91,8 @@ class UTKFace(pl.LightningDataModule):
             age_bin = np.digitize(age, self.AGE_BIN_BOUNDARIES) - 1
             self.y = np.vstack((age_bin, sex, race)).T
 
+        attribute_names = ["age", "sex", "race"]
+
         # Calculate train, validation, test splits.
         stratification_labels = (
             self.y[:, self.stratification_index]
@@ -128,9 +131,15 @@ class UTKFace(pl.LightningDataModule):
         self.num_workers = min(32, len(os.sched_getaffinity(0)))
 
         # Construct the datasets.
-        self.train = UTKFaceDataset(train_x, train_y, self.train_transforms)
-        self.valid = UTKFaceDataset(valid_x, valid_y, self.val_transforms)
-        self.test = UTKFaceDataset(test_x, test_y, self.test_transforms)
+        self.train = AttributeDataset(
+            train_x, train_y, self.train_transforms, attribute_names
+        )
+        self.valid = AttributeDataset(
+            valid_x, valid_y, self.val_transforms, attribute_names
+        )
+        self.test = AttributeDataset(
+            test_x, test_y, self.test_transforms, attribute_names
+        )
 
         # Store the number of classes per label.
         self.n_classes = get_unique_in_columns(self.y)
@@ -160,46 +169,3 @@ class UTKFace(pl.LightningDataModule):
             parsed_filenames.append((f, (int(age), int(gender), int(race))))
 
         return parsed_filenames
-
-
-class UTKFaceDataset(Dataset):
-    def __init__(self, x: np.ndarray, y: np.ndarray, transform) -> None:
-        super().__init__()
-        self.x = x
-        self.y = y
-        self.transform = transform
-        self.support_per_label = self.calc_support_for_labels(self.y)
-        self.weights_per_label = self.calc_weights_for_classes_per_label(
-            self.support_per_label
-        )
-
-        assert len(self.x) == len(self.y)
-
-    def __getitem__(self, index):
-        x = PIL.Image.open(self.x[index])  # type: ignore
-        x = self.transform(x)
-        y = self.y[index]
-        return x, y
-
-    def __len__(self):
-        return len(self.x)
-
-    @staticmethod
-    def calc_support_for_labels(labels: np.ndarray) -> List[np.ndarray]:
-        support_per_label: List[np.ndarray] = []
-        for i in range(labels.shape[1]):
-            _, c = np.unique(labels[:, i], return_counts=True)
-            support_per_label.append(c)
-        return support_per_label
-
-    @staticmethod
-    def calc_weights_for_classes_per_label(
-        support_per_label: List[np.ndarray],
-    ) -> List[np.ndarray]:
-        weights_per_label: List[np.ndarray] = []
-        for support in support_per_label:
-            weights = 1 / support
-            weights = weights / weights.sum() * len(weights)
-            weights_per_label.append(weights)
-
-        return weights_per_label

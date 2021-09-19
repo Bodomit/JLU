@@ -5,7 +5,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import CSVLogger, TensorBoardLogger
 from ruyaml import YAML
 
-from jlu.data import VGGFace2WithMaadFace
+from jlu.data import CelebA, VGGFace2WithMaadFace
 from jlu.systems import AttributeExtractionTask, JLUTrainer
 from jlu.utils import find_last_epoch_path, find_last_path
 
@@ -34,8 +34,8 @@ def main(experiment_path: str, batch_size: int, is_fast_dev_run: bool):
 
     # Construct the datamodules.
     datamodules = [
-        VGGFace2WithMaadFace(batch_size, buffer_size=None),
-        # CelebA(batch_size, buffer_size=None),
+        CelebA(batch_size),
+        VGGFace2WithMaadFace(batch_size),
     ]
 
     yaml = YAML(typ="safe")
