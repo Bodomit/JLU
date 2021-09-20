@@ -119,6 +119,7 @@ class CelebA(pl.LightningDataModule):
         # Get the attribute names and coresponding indexes.
         attr_names = ["id"] + list(attrs.columns)
         attr_names[attr_names.index("Male")] = "sex"
+        self.labels = attr_names
 
         fullpath = np.vectorize(lambda filename: os.path.join(image_absdir, filename))
 
