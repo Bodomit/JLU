@@ -43,6 +43,7 @@ def main(
 
     try:
         feature_model_checkpoint_path = find_last_epoch_path(experiment_path)
+        raise ValueError
     except ValueError:
         feature_model_checkpoint_path = find_last_path(experiment_path)
 
@@ -475,4 +476,3 @@ if __name__ == "__main__":
         args.debug,
         args.cluster_only,
     )
-

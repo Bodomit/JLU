@@ -2,13 +2,13 @@
 #SBATCH --job-name=JLU-TestF
 #SBATCH --partition=k2-gpu
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=4
 #SBATCH --mem=150GB
 #SBATCH --gres=gpu:1
 #SBATCH --output=/mnt/scratch2/users/40057686/logs/jlu-train/%A-%a.log
 #SBATCH --time=3-0
 
-# Invoke with sbatch --array=0-6 ./scripts/train_alpha_verification_test_features.sh $RESULTS_ROOT_DIR
+# Invoke with sbatch --array=0-6 ./scripts/train_alpha_verification_test_obfuscation.sh $RESULTS_ROOT_DIR
 
 module add nvidia-cuda
 
@@ -38,5 +38,5 @@ echo "GPU Stats:"
 nvidia-smi
 echo ""
 
-srun python -m features_test $RESULTSDIR -b 128
+srun python -m obfuscation_train_test $RESULTSDIR -b 128
 
