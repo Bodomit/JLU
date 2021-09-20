@@ -5,14 +5,14 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import CSVLogger, TensorBoardLogger
 from ruyaml import YAML
 
-from jlu.data import VGGFace2WithMaadFace
+from jlu.data import CelebA, VGGFace2WithMaadFace
 from jlu.systems import AttributeExtractionTask, JLUTrainer
 from jlu.utils import find_last_epoch_path, find_last_path
 
 pl.seed_everything(42, workers=True)
 
 
-def main(experiment_path: str, batch_size: int, is_fast_dev_run: bool):
+def main(experiment_path: str, batch_size: int, attribute: str, is_fast_dev_run: bool):
     # Get model class form config and path to the last checkpoint.
     try:
         feature_model_checkpoint_path = find_last_epoch_path(experiment_path)
@@ -34,8 +34,8 @@ def main(experiment_path: str, batch_size: int, is_fast_dev_run: bool):
 
     # Construct the datamodules.
     datamodules = [
-        VGGFace2WithMaadFace(batch_size, buffer_size=None),
-        # CelebA(batch_size, buffer_size=None),
+        CelebA(batch_size),
+        VGGFace2WithMaadFace(batch_size),
     ]
 
     yaml = YAML(typ="safe")
@@ -54,7 +54,7 @@ def main(experiment_path: str, batch_size: int, is_fast_dev_run: bool):
         ]
 
         # Train the attribute extraction model.
-        aem_task = AttributeExtractionTask(feature_model, 0.001)
+        aem_task = AttributeExtractionTask(feature_model, 0.001, attribute)
         trainer = pl.Trainer(
             logger=loggers,
             max_epochs=10,
@@ -87,6 +87,7 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("experiment_path")
     parser.add_argument("--batch-size", "-b", type=int, default=512)
+    parser.add_argument("--attribute", "-a", default="sex")
     parser.add_argument("--debug", action="store_true")
     args = parser.parse_args()
-    main(args.experiment_path, args.batch_size, args.debug)
+    main(args.experiment_path, args.batch_size, args.attribute, args.debug)

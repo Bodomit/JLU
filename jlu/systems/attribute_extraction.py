@@ -15,6 +15,7 @@ class AttributeExtractionTask(pl.LightningModule):
         self,
         feature_model: pl.LightningModule,
         learning_rate: float,
+        attribute: str,
         n_outputs: int = 2,
         freeze_feature_model: bool = True,
     ) -> None:
@@ -24,6 +25,7 @@ class AttributeExtractionTask(pl.LightningModule):
             [m for m in feature_model.modules() if hasattr(m, "out_features")]
         )[-1].out_features
 
+        self.attribute = attribute
         self.feature_model = feature_model
         self.attribute_model = AttributeExtractionModel(
             n_inputs=n_feature_outputs, n_outputs=n_outputs
@@ -62,9 +64,15 @@ class AttributeExtractionTask(pl.LightningModule):
         x = self.attribute_model(x)
         return x
 
+    def on_fit_start(self) -> None:
+        self.attribute_index = self.trainer.datamodule.labels.index(self.attribute)
+
+    def on_test_start(self) -> None:
+        self.attribute_index = self.trainer.datamodule.labels.index(self.attribute)
+
     def training_step(self, batch, batch_idx):
         x, y = batch
-        a = y[:, 1]
+        a = y[:, self.attribute_index]
         a = a.squeeze()
 
         a_hat = self(x)
@@ -76,7 +84,7 @@ class AttributeExtractionTask(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
-        a = y[:, 1]
+        a = y[:, self.attribute_index]
         a = a.squeeze()
 
         a_hat = self(x)
@@ -86,7 +94,7 @@ class AttributeExtractionTask(pl.LightningModule):
 
     def test_step(self, batch, batch_idx):
         x, y = batch
-        a = y[:, 1]
+        a = y[:, self.attribute_index]
         a = a.squeeze()
 
         a_hat = self(x)

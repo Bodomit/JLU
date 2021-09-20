@@ -5,12 +5,12 @@ from typing import Any, List, Optional, Set, Tuple
 import numpy as np
 import pandas
 import pytorch_lightning as pl
-from jlu.data.utils import get_unique_in_columns, parse_dataset_dir
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from torchvision.datasets import ImageFolder
 
-from .vggface2 import VGGFace2Dataset
+from .common import AttributeDataset
+from .utils import get_unique_in_columns, parse_dataset_dir
 
 
 class VGGFace2WithMaadFace(pl.LightningDataModule):
@@ -104,7 +104,7 @@ class VGGFace2WithMaadFace(pl.LightningDataModule):
 
     def _process_train_valid(
         self, attributes: pandas.DataFrame
-    ) -> Tuple[VGGFace2Dataset, VGGFace2Dataset]:
+    ) -> Tuple[AttributeDataset, AttributeDataset]:
         real_split_dir = os.path.join(self.dataset_dir, "train")
 
         # Get the full training set.
@@ -146,7 +146,7 @@ class VGGFace2WithMaadFace(pl.LightningDataModule):
 
         return train_dataset, val_dataset
 
-    def _process_test(self, attributes: pandas.DataFrame) -> VGGFace2Dataset:
+    def _process_test(self, attributes: pandas.DataFrame) -> AttributeDataset:
         real_split_dir = os.path.join(self.dataset_dir, "test")
 
         # Get the full test set, removing those without attributes.
@@ -169,7 +169,7 @@ class VGGFace2WithMaadFace(pl.LightningDataModule):
         samples: List[Tuple[str, int]],
         attributes: pandas.DataFrame,
         transform: transforms.Compose,
-    ) -> VGGFace2Dataset:
+    ) -> AttributeDataset:
 
         # Remove any attribute lines that are not in the dataset samples.
         real_imgs = [os.path.relpath(s[0], start=real_split_dir) for s in samples]
@@ -205,7 +205,7 @@ class VGGFace2WithMaadFace(pl.LightningDataModule):
             (np.expand_dims(local_identities, axis=1), attributes_), axis=1
         )
 
-        return VGGFace2Dataset(X, Y, transform, self.labels)
+        return AttributeDataset(X, Y, transform, self.labels)
 
     @staticmethod
     def get_val_set_classes(
@@ -216,4 +216,3 @@ class VGGFace2WithMaadFace(pl.LightningDataModule):
         rng = np.random.default_rng(valid_split_seed)
         valid_classes = rng.choice(sorted(classes), size=n_valid_set_classes)
         return set(valid_classes)
-
