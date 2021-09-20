@@ -24,19 +24,25 @@ class Verifier:
     def __init__(
         self,
         batch_size: int,
+        id_index: int,
+        attribute_index: int,
         max_n_matching_pairs: Optional[int],
         max_n_classes: Optional[int],
         debug: bool,
         seed: int,
     ):
         self.batch_size = batch_size
+        self.id_index = id_index
+        self.attribute_index = attribute_index
         self.max_n_matching_pairs = max_n_matching_pairs
         self.max_n_classes = max_n_classes
         self.rnd = np.random.RandomState(seed)
         self.debug = debug
 
     def setup(self, dataloader: DataLoader):
-        samples, data_map = self._load_data(dataloader)
+        samples, data_map = self._load_data(
+            dataloader, self.id_index, self.attribute_index
+        )
         samples_per_label = self.get_samples_per_label(samples)
 
         if self.max_n_classes is not None:
@@ -70,14 +76,14 @@ class Verifier:
 
     @staticmethod
     def _load_data(
-        dataloader: DataLoader,
+        dataloader: DataLoader, id_index: int, attribute_index: int
     ) -> Tuple[Set[AnnotatedSample], Dict[int, np.ndarray]]:
 
         samples: Set[AnnotatedSample] = set()
         data_map: Dict[int, np.ndarray] = {}
 
         for xb, yb in dataloader:
-            for x, l, a in zip(xb, yb[:, 0], yb[:, 1]):
+            for x, l, a in zip(xb, yb[:, id_index], yb[:, attribute_index]):
                 key = len(data_map)
                 data_map[key] = x
                 samples.add((key, int(l), int(a)))
@@ -258,13 +264,23 @@ class CVThresholdingVerifier(Verifier):
     def __init__(
         self,
         batch_size: int,
+        id_index: int,
+        attribute_index: int,
         max_n_matching_pairs: Optional[int] = 1000000,
         max_n_classes: Optional[int] = None,
         debug=False,
         seed: int = 42,
         n_splits=10,
     ):
-        super().__init__(batch_size, max_n_matching_pairs, max_n_classes, debug, seed)
+        super().__init__(
+            batch_size,
+            id_index,
+            attribute_index,
+            max_n_matching_pairs,
+            max_n_classes,
+            debug,
+            seed,
+        )
         self.n_splits = n_splits
 
     def cv_thresholding_verification(
@@ -467,9 +483,17 @@ class BalancedAccuracy(Metric):
 
 class ReidentificationTester:
     def __init__(
-        self, batch_size: int, max_n_classes: Optional[int], debug: bool, seed: int,
+        self,
+        batch_size: int,
+        id_index: int,
+        attribute_index: int,
+        max_n_classes: Optional[int],
+        debug: bool,
+        seed: int,
     ):
         self.batch_size = batch_size
+        self.id_index = id_index
+        self.attribute_index = attribute_index
         self.max_n_classes = max_n_classes
         self.rnd = np.random.RandomState(seed)
         self.debug = debug
@@ -478,7 +502,9 @@ class ReidentificationTester:
         self.num_workers = min(32, len(os.sched_getaffinity(0)))
 
     def setup(self, dataloader: DataLoader):
-        samples, data_map = self._load_data(dataloader)
+        samples, data_map = self._load_data(
+            dataloader, self.id_index, self.attribute_index
+        )
         samples_per_label = self.get_samples_per_label(samples)
 
         if self.max_n_classes is not None:
@@ -559,14 +585,14 @@ class ReidentificationTester:
 
     @staticmethod
     def _load_data(
-        dataloader: DataLoader,
+        dataloader: DataLoader, id_index: int, attribute_index: int,
     ) -> Tuple[Set[AnnotatedSample], Dict[int, np.ndarray]]:
 
         samples: Set[AnnotatedSample] = set()
         data_map: Dict[int, np.ndarray] = {}
 
         for xb, yb in dataloader:
-            for x, l, a in zip(xb, yb[:, 0], yb[:, 1]):
+            for x, l, a in zip(xb, yb[:, id_index], yb[:, attribute_index]):
                 key = len(data_map)
                 data_map[key] = x
                 samples.add((key, int(l), int(a)))

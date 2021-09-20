@@ -24,7 +24,8 @@ from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import StandardScaler
 from torch.utils.data.dataloader import DataLoader
 
-from jlu.data import VGGFace2WithMaadFace
+from jlu.data import CelebA, VGGFace2WithMaadFace
+from jlu.data.common import AttributeDataset
 from jlu.metrics import CVThresholdingVerifier, ReidentificationTester
 from jlu.systems import JLUTrainer
 from jlu.utils import find_last_epoch_path, find_last_path, save_cv_verification_results
@@ -33,7 +34,11 @@ pl.seed_everything(42, workers=True)
 
 
 def main(
-    experiment_path: str, batch_size: int, is_debug: bool, cluster_only: bool,
+    experiment_path: str,
+    batch_size: int,
+    attribute: str,
+    is_debug: bool,
+    cluster_only: bool,
 ):
 
     try:
@@ -56,8 +61,8 @@ def main(
 
     # Construct the datamodules.
     datamodules = [
-        # CelebA(batch_size, ["Male"], buffer_size=None),
-        VGGFace2WithMaadFace(batch_size, val_split=0),
+        CelebA(batch_size),
+        VGGFace2WithMaadFace(batch_size),
     ]
 
     # Get the device.
@@ -74,11 +79,16 @@ def main(
 
         print(f"Dataset Module: {dataset_name}")
 
+        assert isinstance(test_dataset, AttributeDataset)
+        id_index = test_dataset.labels.index("id")
+        attribute_index = test_dataset.labels.index(attribute)
+
         cluster(
             experiment_path,
             dataset_name,
             test_dataloader,
             feature_model,
+            attribute_index,
             device,
             is_debug=is_debug,
         )
@@ -91,11 +101,11 @@ def main(
             dataset_name,
             test_dataloader,
             feature_model,
+            attribute_index,
             device,
             is_debug=is_debug,
         )
 
-        id_index = test_dataset.labels.index("id")
         n_class_schedule = [10] + list(
             n_classes_scheduler(len(test_dataset.support_per_label[id_index]))
         )
@@ -108,6 +118,8 @@ def main(
                 dataset_name,
                 n_classes,
                 batch_size,
+                id_index,
+                attribute_index,
                 is_debug,
                 test_dataloader,
                 feature_model,
@@ -119,6 +131,8 @@ def main(
                 dataset_name,
                 n_classes,
                 batch_size,
+                id_index,
+                attribute_index,
                 is_debug,
                 test_dataloader,
                 feature_model,
@@ -131,6 +145,7 @@ def cluster(
     dataset_name: str,
     test_dataloader: DataLoader,
     feature_model: torch.nn.Module,
+    attribute_index: int,
     device: torch.device,
     perplexity=50,
     is_debug=False,
@@ -143,8 +158,6 @@ def cluster(
 
     embeddings_per_batch: List[np.ndarray] = []
     attributes_per_batch: List[np.ndarray] = []
-
-    attribute_index = test_dataloader.dataset.labels.index("sex")
 
     for x, y in tqdm.tqdm(
         test_dataloader, desc="Clustering - Embeddings", dynamic_ncols=True
@@ -281,6 +294,7 @@ def visualise(
     dataset_name: str,
     test_dataloader: DataLoader,
     feature_model: torch.nn.Module,
+    attribute_index: int,
     device: torch.device,
     perplexity=30,
     is_debug=False,
@@ -293,7 +307,6 @@ def visualise(
 
     embeddings_per_batch: List[np.ndarray] = []
     attributes_per_batch: List[np.ndarray] = []
-    attribute_index = test_dataloader.dataset.labels.index("sex")
 
     for x, y in tqdm.tqdm(
         test_dataloader, desc="Visualiser - Embeddings", dynamic_ncols=True
@@ -355,6 +368,8 @@ def reid_scenario(
     dataset_name: str,
     n_classes: int,
     batch_size: int,
+    id_index: int,
+    attribute_index: int,
     is_debug: bool,
     test_dataloader: DataLoader,
     feature_model: torch.nn.Module,
@@ -367,7 +382,12 @@ def reid_scenario(
 
     # Get the tester.
     tester = ReidentificationTester(
-        batch_size, max_n_classes=n_classes, debug=is_debug, seed=42
+        batch_size,
+        id_index,
+        attribute_index,
+        max_n_classes=n_classes,
+        debug=is_debug,
+        seed=42,
     )
 
     # load the data.
@@ -389,6 +409,8 @@ def verification_scenario(
     dataset_name: str,
     n_classes: int,
     batch_size: int,
+    id_index: int,
+    attribute_index: int,
     is_debug: bool,
     test_dataloader: DataLoader,
     feature_model: torch.nn.Module,
@@ -401,7 +423,7 @@ def verification_scenario(
     os.makedirs(results_dir, exist_ok=True)
 
     verifier = CVThresholdingVerifier(
-        batch_size, max_n_classes=n_classes, debug=is_debug
+        batch_size, id_index, attribute_index, max_n_classes=n_classes, debug=is_debug
     )
 
     verifier.setup(test_dataloader)
@@ -444,5 +466,13 @@ if __name__ == "__main__":
     parser.add_argument("--batch-size", "-b", type=int, default=512)
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--cluster-only", action="store_true")
+    parser.add_argument("--attribute", "-a", default="sex")
     args = parser.parse_args()
-    main(args.experiment_path, args.batch_size, args.debug, args.cluster_only)
+    main(
+        args.experiment_path,
+        args.batch_size,
+        args.attribute,
+        args.debug,
+        args.cluster_only,
+    )
+
