@@ -10,7 +10,7 @@ from torchvision import transforms
 from torchvision.datasets import ImageFolder
 
 from .common import AttributeDataset
-from .utils import get_unique_in_columns, parse_dataset_dir
+from .utils import limit_dataset_samples, parse_dataset_dir
 
 
 class CelebA(pl.LightningDataModule):
@@ -22,6 +22,7 @@ class CelebA(pl.LightningDataModule):
         use_png: bool = True,
         random_affine=False,
         random_crop=False,
+        max_samples_per_split=None,
         **kwargs
     ):
 
@@ -31,6 +32,7 @@ class CelebA(pl.LightningDataModule):
         self.num_workers = min(32, len(os.sched_getaffinity(0)))
         self.image_dir = "img_align_celeba_png" if use_png else "img_align_celeba"
         self.ext = "png" if use_png else "jpg"
+        self.max_samples_per_split = max_samples_per_split
 
         # Define the transformations.
         common_transforms = transforms.Compose(
@@ -160,6 +162,9 @@ class CelebA(pl.LightningDataModule):
             y = np.concatenate(
                 (np.expand_dims(local_identities, axis=1), attrs_), axis=1
             )
+
+            if self.max_samples_per_split is not None:
+                x, y = limit_dataset_samples(x, y, self.max_samples_per_split)
 
             split_dataset = AttributeDataset(x, y, transform, attr_names)
 

@@ -1,6 +1,6 @@
 import os
 from argparse import ArgumentParser
-from typing import Generator, List
+from typing import Generator, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -39,10 +39,12 @@ def main(
     attribute: str,
     is_debug: bool,
     cluster_only: bool,
+    max_samples: Optional[int],
 ):
 
     try:
         feature_model_checkpoint_path = find_last_epoch_path(experiment_path)
+        raise ValueError
     except ValueError:
         feature_model_checkpoint_path = find_last_path(experiment_path)
 
@@ -61,8 +63,8 @@ def main(
 
     # Construct the datamodules.
     datamodules = [
-        CelebA(batch_size),
-        VGGFace2WithMaadFace(batch_size),
+        CelebA(batch_size, max_samples_per_split=max_samples),
+        VGGFace2WithMaadFace(batch_size, max_samples_per_split=max_samples),
     ]
 
     # Get the device.
@@ -467,6 +469,7 @@ if __name__ == "__main__":
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--cluster-only", action="store_true")
     parser.add_argument("--attribute", "-a", default="sex")
+    parser.add_argument("--max-samples", type=int, default=None)
     args = parser.parse_args()
     main(
         args.experiment_path,
@@ -474,5 +477,5 @@ if __name__ == "__main__":
         args.attribute,
         args.debug,
         args.cluster_only,
+        args.max_samples,
     )
-

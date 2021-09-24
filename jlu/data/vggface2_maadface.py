@@ -10,7 +10,7 @@ from torchvision import transforms
 from torchvision.datasets import ImageFolder
 
 from .common import AttributeDataset
-from .utils import get_unique_in_columns, parse_dataset_dir
+from .utils import get_unique_in_columns, limit_dataset_samples, parse_dataset_dir
 
 
 class VGGFace2WithMaadFace(pl.LightningDataModule):
@@ -22,6 +22,7 @@ class VGGFace2WithMaadFace(pl.LightningDataModule):
         val_split=0.1,
         random_affine=False,
         random_crop=False,
+        max_samples_per_split=None,
         **kwargs,
     ):
 
@@ -31,6 +32,7 @@ class VGGFace2WithMaadFace(pl.LightningDataModule):
         self.train_split = 1 - val_split
         self.num_workers = min(32, len(os.sched_getaffinity(0)))
         self.val_split = val_split
+        self.max_samples_per_split = max_samples_per_split
 
         # Define the transformations.
         common_transforms = transforms.Compose(
@@ -204,6 +206,9 @@ class VGGFace2WithMaadFace(pl.LightningDataModule):
         Y = np.concatenate(
             (np.expand_dims(local_identities, axis=1), attributes_), axis=1
         )
+
+        if self.max_samples_per_split is not None:
+            X, Y = limit_dataset_samples(X, Y, self.max_samples_per_split)
 
         return AttributeDataset(X, Y, transform, self.labels)
 
