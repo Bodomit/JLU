@@ -16,6 +16,7 @@ def main(experiment_path: str, batch_size: int, attribute: str, is_fast_dev_run:
     # Get model class form config and path to the last checkpoint.
     try:
         feature_model_checkpoint_path = find_last_epoch_path(experiment_path)
+        raise ValueError
     except ValueError:
         feature_model_checkpoint_path = find_last_path(experiment_path)
 

@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=JLU-Train
+#SBATCH --job-name=JLU-TestF
 #SBATCH --partition=k2-gpu
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=64GB
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=150GB
 #SBATCH --gres=gpu:1
 #SBATCH --output=/mnt/scratch2/users/40057686/logs/jlu-train/%A-%a.log
 #SBATCH --time=3-0
-#SBATCH --signal=SIGUSR1@90
 
-# Invoke with sbatch --array=0-6 ./scripts/train_alpha_verification.sh $RESULTS_ROOT_DIR $PRETRAINED_PATH
+# Invoke with sbatch --array=0-6 ./scripts/train_alpha_verification_test_obfuscation.sh $RESULTS_ROOT_DIR
 
 module add nvidia-cuda
 
@@ -26,7 +25,7 @@ echo "ALPHA_ID: $ALPHA_ID"
 ALPHAS=(0 0.01 0.1 1 10 100 1000)
 ALPHA=${ALPHAS[$ALPHA_ID]}
 
-RESULTSDIR=$RESULTS_ROOT_DIR/jlu-train/verification_alphas/$ALPHA
+RESULTSDIR=$RESULTS_ROOT_DIR/$ALPHA
 
 echo "ALPHA: $ALPHA"
 echo "RESULTSDIR: $RESULTSDIR"
@@ -39,5 +38,5 @@ echo "GPU Stats:"
 nvidia-smi
 echo ""
 
-srun python -m train $RESULTSDIR -b 128 --alpha $ALPHA -d vggface2_maadface -p id
+srun python -m obfuscation_train_test $RESULTSDIR -b 128
 

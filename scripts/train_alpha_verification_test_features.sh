@@ -3,13 +3,12 @@
 #SBATCH --partition=k2-gpu
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=200GB
+#SBATCH --mem=150GB
 #SBATCH --gres=gpu:1
 #SBATCH --output=/mnt/scratch2/users/40057686/logs/jlu-train/%A-%a.log
 #SBATCH --time=3-0
-#SBATCH --signal=SIGUSR1@90
 
-# Invoke with sbatch --array=0-5 ./scripts/train_alpha_verification_test_features.sh $RESULTS_ROOT_DIR
+# Invoke with sbatch --array=0-6 ./scripts/train_alpha_verification_test_features.sh $RESULTS_ROOT_DIR
 
 module add nvidia-cuda
 
@@ -23,7 +22,7 @@ ALPHA_ID=${SLURM_ARRAY_TASK_ID:-0}
 
 echo "ALPHA_ID: $ALPHA_ID"
 
-ALPHAS=(0 0.01 0.1 1 10 100 )
+ALPHAS=(0 0.01 0.1 1 10 100 1000)
 ALPHA=${ALPHAS[$ALPHA_ID]}
 
 RESULTSDIR=$RESULTS_ROOT_DIR/$ALPHA
