@@ -9,7 +9,7 @@
 #SBATCH --time=3-0
 #SBATCH --signal=SIGUSR1@90
 
-# Invoke with sbatch --array=0-6 ./scripts/train_alpha_verification.sh $RESULTS_ROOT_DIR $PRETRAINED_PATH
+# Invoke with sbatch --array=0-6 ./scripts/train_alpha_verification_resnet.sh $RESULTS_ROOT_DIR $PRETRAINED_PATH
 
 module add nvidia-cuda
 
