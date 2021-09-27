@@ -29,6 +29,7 @@ class JLUTrainer(pl.LightningModule):
         *args,
         ls_average_n_steps: int = 1,
         ls_is_best_patentice: int = 100,
+        feature_model: str = "vggm",
         **kwargs,
     ) -> None:
         super().__init__()
@@ -43,6 +44,7 @@ class JLUTrainer(pl.LightningModule):
         self.bootstrap_epochs = bootstrap_epochs
         self.datamodule_n_classes = datamodule_n_classes
         self.primary_only = primary_only
+        self.feature_model = feature_model.lower()
 
         self.ls_average_n_steps = ls_average_n_steps
         self.ls_is_best_patentice = ls_is_best_patentice
@@ -60,7 +62,9 @@ class JLUTrainer(pl.LightningModule):
 
         # Get the model.
         n_classes = self.datamodule_n_classes[all_idx]
-        self.model = JLUMultitaskModel(n_classes, pretrained_base, dropout=dropout)
+        self.model = JLUMultitaskModel(
+            n_classes, pretrained_base, dropout=dropout, feature_model=feature_model
+        )
 
         # Store the loss object.
         self.uniform_kldiv = UniformTargetKLDivergence()

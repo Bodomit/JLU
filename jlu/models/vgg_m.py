@@ -4,6 +4,9 @@ import torch.nn as nn
 
 
 class VggMBase(pl.LightningModule):
+
+    FEATURE_LENGTH: int = 4096
+
     def __init__(self, dropout: float = 0.5):
         super().__init__()
 
