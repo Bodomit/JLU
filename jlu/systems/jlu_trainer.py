@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from jlu.callbacks import JLUAwareEarlyStopping
 from jlu.losses import UniformTargetKLDivergence
 from jlu.models import JLUMultitaskModel
-from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
+from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torchmetrics.functional import accuracy
 
@@ -266,9 +266,9 @@ class JLUTrainer(pl.LightningModule):
 
     def configure_callbacks(self):
         super().configure_callbacks()
-        early_stopping = JLUAwareEarlyStopping("val_loss/lp+alconf", patience=20)
+        early_stopping = JLUAwareEarlyStopping("loss/lp+alconf", patience=20)
         checkpoint = ModelCheckpoint(
-            monitor="val_loss/lp+alconf", save_last=True, save_top_k=3
+            monitor="loss/lp+alconf", save_last=True, save_top_k=3
         )
         learning_rate = LearningRateMonitor()
         return [early_stopping, checkpoint, learning_rate]
