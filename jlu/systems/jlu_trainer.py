@@ -133,8 +133,7 @@ class JLUTrainer(pl.LightningModule):
             else:
                 schedulers[1].step(self.trainer.callback_metrics["loss/ls"])
         except KeyError:
-            if self.current_epoch > 0:
-                raise
+            pass
 
     def training_step(self, batch, batch_idx):
         if self.train_lp_lconf:
