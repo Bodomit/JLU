@@ -44,8 +44,8 @@ class VggMPretrainer(pl.LightningModule):
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
-                "scheduler": ReduceLROnPlateau(optimizer, patience=10),
-                "monitor": "loss",
+                "scheduler": ReduceLROnPlateau(optimizer, patience=5),
+                "monitor": "val_loss",
             },
         }
 
